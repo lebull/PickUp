@@ -5,6 +5,7 @@ import { SubmissionList } from './SubmissionList.tsx'
 import type { SortField, SortDir, ScoreMetric } from './SubmissionList.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
+import { SplitPane } from './SplitPane.tsx'
 
 function SubmissionDetailRoute() {
   const { djIndex } = useParams<{ djIndex: string }>()
@@ -83,9 +84,9 @@ export function SubmissionsView() {
   }
 
   return (
-    <div className={`split-layout${hasSelection ? ' has-selection' : ''}`}>
+    <SplitPane initialSplit={40} minLeft={25} minRight={20}>
       <div
-        className="split-list"
+        className="split-pane-list-inner"
         ref={listRef}
         tabIndex={0}
       >
@@ -107,13 +108,13 @@ export function SubmissionsView() {
           listRef={listRef}
         />
       </div>
-      <div className="split-detail">
+      <div className="split-pane-detail-inner">
         {hasSelection ? (
           <SubmissionDetailRoute />
         ) : (
           <p className="no-selection">Select a submission to view details</p>
         )}
       </div>
-    </div>
+    </SplitPane>
   )
 }

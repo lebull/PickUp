@@ -3,15 +3,14 @@ import { Routes, Route, Navigate, NavLink, Outlet, useParams, Link } from 'react
 import './App.css'
 import { parseSubmissions } from './loadSubmissions.ts'
 import type { Submission, Project } from './types.ts'
-import { CsvImport } from './components/CsvImport.tsx'
 import { ProjectList } from './components/ProjectList.tsx'
 import { ProjectCreate } from './components/ProjectCreate.tsx'
 import { SubmissionsView } from './components/SubmissionsView.tsx'
 import { LineupView } from './components/LineupView.tsx'
-import { getProject, saveProject, exportProject } from './projectStore.ts'
+import { getProject, saveProject } from './projectStore.ts'
 import { ProjectContext } from './ProjectContext.ts'
 import { AppPreferencesContext, useAppPreferencesState } from './AppPreferencesContext.ts'
-import { AppPreferencesControls } from './components/AppPreferencesControls.tsx'
+import { NavActionsMenu } from './components/NavActionsMenu.tsx'
 
 // ── Project Workspace ────────────────────────────────────────────────────────
 
@@ -104,9 +103,6 @@ function ProjectWorkspace() {
           <Link to="/" className="back-link">← Projects</Link>
           <h1 className="project-title">{project.name}</h1>
           {submissions !== null && (
-            <span className="submission-count">{submissions.length} submissions</span>
-          )}
-          {submissions !== null && (
             <nav className="mode-tabs">
               <NavLink
                 to="submissions"
@@ -123,15 +119,7 @@ function ProjectWorkspace() {
             </nav>
           )}
           <div className="header-actions">
-            <AppPreferencesControls />
-            <button
-              type="button"
-              className="btn-secondary btn-small"
-              onClick={() => exportProject(project)}
-            >
-              Export
-            </button>
-            <CsvImport onImport={handleImport} />
+            <NavActionsMenu project={project} onImport={handleImport} />
           </div>
         </header>
 

@@ -130,6 +130,11 @@ export function SubmissionList({
             </button>
           ))}
         </div>
+        <span className="submission-count-label">
+          {filtered.length < submissions.length
+            ? `${filtered.length} / ${submissions.length} submissions`
+            : `${submissions.length} submissions`}
+        </span>
       </div>
       <div className="submission-table-wrapper">
         <table className="submission-table">

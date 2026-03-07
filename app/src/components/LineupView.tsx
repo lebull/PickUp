@@ -6,6 +6,7 @@ import { DJSelectionPanel } from './DJSelectionPanel.tsx'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
 import type { Stage } from '../types.ts'
 import { saveProject } from '../projectStore.ts'
+import { SplitPane } from './SplitPane.tsx'
 
 export function LineupView() {
   const { project, setProject, submissions, rowCountMismatch, setRowCountMismatch } = useProjectContext()
@@ -110,45 +111,69 @@ export function LineupView() {
           </button>
         </div>
       )}
-      <div className={`lineup-main${activeSlot ? ' lineup-main--split' : ''}`}>
-        <div
-          className="lineup-grid-wrapper"
-          onClick={(e) => {
-            // Close panel when clicking the grid backdrop (not a slot)
-            if ((e.target as HTMLElement).classList.contains('lineup-grid-wrapper')) {
-              setActiveSlot(null)
-            }
-          }}
-        >
-          <LineupGrid
-            submissions={submissions}
-            stages={project.stages}
-            assignments={project.assignments}
-            onAssign={handleAssign}
-            onRemove={handleRemove}
-            onAddSimultaneous={handleAddSimultaneous}
-            onRemoveSimultaneous={handleRemoveSimultaneous}
-            onConfigureStages={() => setShowStageConfig(true)}
-            onSlotClick={setActiveSlot}
-            onSimultaneousClick={handleSimultaneousClick}
-            activeSlotKey={
-              activeSlot
-                ? `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.slotIndex}`
-                : null
-            }
-          />
-        </div>
-        {activeSlot && (
-          <DJSelectionPanel
-            submissions={submissions}
-            stages={project.stages}
-            assignments={project.assignments}
-            activeSlot={activeSlot}
-            onAssign={handleAssign}
-            onRemove={handleRemove}
-            onAddSimultaneous={handleAddSimultaneous}
-            onClose={() => setActiveSlot(null)}
-          />
+      <div className={`lineup-main${activeSlot ? ' lineup-main--has-panel' : ''}`}>
+        {activeSlot ? (
+          <SplitPane initialSplit={65} minLeft={35} minRight={20}>
+            <div
+              className="lineup-grid-wrapper"
+              onClick={(e) => {
+                if ((e.target as HTMLElement).classList.contains('lineup-grid-wrapper')) {
+                  setActiveSlot(null)
+                }
+              }}
+            >
+              <LineupGrid
+                submissions={submissions}
+                stages={project.stages}
+                assignments={project.assignments}
+                onAssign={handleAssign}
+                onRemove={handleRemove}
+                onAddSimultaneous={handleAddSimultaneous}
+                onRemoveSimultaneous={handleRemoveSimultaneous}
+                onConfigureStages={() => setShowStageConfig(true)}
+                onSlotClick={setActiveSlot}
+                onSimultaneousClick={handleSimultaneousClick}
+                activeSlotKey={
+                  activeSlot
+                    ? `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.slotIndex}`
+                    : null
+                }
+              />
+            </div>
+            <DJSelectionPanel
+              submissions={submissions}
+              stages={project.stages}
+              assignments={project.assignments}
+              activeSlot={activeSlot}
+              onAssign={handleAssign}
+              onRemove={handleRemove}
+              onAddSimultaneous={handleAddSimultaneous}
+              onClose={() => setActiveSlot(null)}
+            />
+          </SplitPane>
+        ) : (
+          <div
+            className="lineup-grid-wrapper"
+            onClick={(e) => {
+              if ((e.target as HTMLElement).classList.contains('lineup-grid-wrapper')) {
+                setActiveSlot(null)
+              }
+            }}
+          >
+            <LineupGrid
+              submissions={submissions}
+              stages={project.stages}
+              assignments={project.assignments}
+              onAssign={handleAssign}
+              onRemove={handleRemove}
+              onAddSimultaneous={handleAddSimultaneous}
+              onRemoveSimultaneous={handleRemoveSimultaneous}
+              onConfigureStages={() => setShowStageConfig(true)}
+              onSlotClick={setActiveSlot}
+              onSimultaneousClick={handleSimultaneousClick}
+              activeSlotKey={null}
+            />
+          </div>
         )}
       </div>
       <div className="lineup-footer">
