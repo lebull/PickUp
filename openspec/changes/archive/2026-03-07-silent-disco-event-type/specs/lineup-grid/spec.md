@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Render the schedule grid
 The application SHALL render a schedule grid for a selected evening. Columns represent stages that are active on the selected evening. Sequential stage columns have rows representing time slots derived from each stage's start time, end time, and slot duration. Simultaneous stage columns render as a single cell spanning the full time axis, showing all assigned DJs concurrently. Each sequential cell is the intersection of a stage column and a time slot row.

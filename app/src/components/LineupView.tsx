@@ -36,6 +36,41 @@ export function LineupView() {
     })
   }
 
+  /** Adds a DJ to a simultaneous stage position (1–3). Enforces the max-3 cap. */
+  function handleAddSimultaneous(
+    stageId: string,
+    evening: string,
+    positionIndex: 1 | 2 | 3,
+    djName: string
+  ) {
+    setProject((prev) => {
+      if (!prev) return prev
+      const existing = prev.assignments.filter(
+        (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+      )
+      // Enforce max-3 cap at the data layer
+      if (existing.length >= 3) return prev
+      const assignments = [
+        ...prev.assignments.filter(
+          (a) => !(a.stageId === stageId && a.evening === evening && a.positionIndex === positionIndex)
+        ),
+        { stageId, evening, positionIndex, djName },
+      ]
+      return { ...prev, assignments }
+    })
+  }
+
+  /** Removes a DJ from a simultaneous stage position. */
+  function handleRemoveSimultaneous(stageId: string, evening: string, positionIndex: 1 | 2 | 3) {
+    setProject((prev) => {
+      if (!prev) return prev
+      const assignments = prev.assignments.filter(
+        (a) => !(a.stageId === stageId && a.evening === evening && a.positionIndex === positionIndex)
+      )
+      return { ...prev, assignments }
+    })
+  }
+
   function handleSaveStages(stages: Stage[]) {
     setProject((prev) => {
       if (!prev) return prev
@@ -75,6 +110,8 @@ export function LineupView() {
           assignments={project.assignments}
           onAssign={handleAssign}
           onRemove={handleRemove}
+          onAddSimultaneous={handleAddSimultaneous}
+          onRemoveSimultaneous={handleRemoveSimultaneous}
           onConfigureStages={() => setShowStageConfig(true)}
         />
       </div>

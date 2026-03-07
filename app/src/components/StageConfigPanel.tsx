@@ -13,6 +13,7 @@ function newStage(): Stage {
   return {
     id: crypto.randomUUID(),
     name: '',
+    stageType: 'sequential',
     activeDays: [],
     schedule: {},
     slotDuration: 60,
@@ -116,17 +117,37 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                         onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                         placeholder="Stage name"
                       />
-                      <label className="stage-field-label">Slot (min)</label>
-                      <input
-                        type="number"
-                        className="slot-duration-input"
-                        value={stage.slotDuration}
-                        min={15}
-                        step={15}
+                      <label className="stage-field-label">Type</label>
+                      <select
+                        className="stage-type-select"
+                        value={stage.stageType ?? 'sequential'}
                         onChange={(e) =>
-                          updateStage(stage.id, { slotDuration: Number(e.target.value) })
+                          updateStage(stage.id, {
+                            stageType: e.target.value as 'sequential' | 'simultaneous',
+                          })
                         }
-                      />
+                      >
+                        <option value="sequential">Sequential</option>
+                        <option value="simultaneous">Simultaneous</option>
+                      </select>
+                      {(stage.stageType ?? 'sequential') === 'sequential' && (
+                        <>
+                          <label className="stage-field-label">Slot (min)</label>
+                          <input
+                            type="number"
+                            className="slot-duration-input"
+                            value={stage.slotDuration}
+                            min={15}
+                            step={15}
+                            onChange={(e) =>
+                              updateStage(stage.id, { slotDuration: Number(e.target.value) })
+                            }
+                          />
+                        </>
+                      )}
+                      {(stage.stageType ?? 'sequential') === 'simultaneous' && (
+                        <span className="simultaneous-note">Up to 3 DJs play simultaneously</span>
+                      )}
                       <button
                         type="button"
                         className="btn-danger btn-small"
@@ -178,7 +199,8 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                                 {crossesMidnight && (
                                   <span className="midnight-hint" title="Event crosses midnight">↷ next day</span>
                                 )}
-                                {labels.length > 0 && (
+                                {/* Slot count only meaningful for sequential stages */}
+                                {(stage.stageType ?? 'sequential') === 'sequential' && labels.length > 0 && (
                                   <span className="slot-count-hint">
                                     {labels.length} slot{labels.length !== 1 ? 's' : ''}
                                   </span>

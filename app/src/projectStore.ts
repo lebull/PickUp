@@ -36,18 +36,34 @@ export async function createProject(name: string): Promise<Project> {
   return project
 }
 
+/**
+ * Normalizes a project loaded from IndexedDB to ensure fields added in later
+ * versions are present. This provides backward compatibility without a DB migration.
+ */
+function normalizeProject(project: Project): Project {
+  return {
+    ...project,
+    // stageType was added in the silent-disco-event-type change.
+    // Legacy stages without the field default to "sequential".
+    stages: project.stages.map((s) => ({
+      ...s,
+      stageType: s.stageType ?? 'sequential',
+    })),
+  }
+}
+
 export async function getProject(id: string): Promise<Project | null> {
   const db = await getDB()
   const project: Project | undefined = await db.get(STORE_NAME, id)
-  return project ?? null
+  return project ? normalizeProject(project) : null
 }
 
 export async function listProjects(): Promise<Project[]> {
   const db = await getDB()
   const all: Project[] = await db.getAll(STORE_NAME)
-  return all.sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  )
+  return all
+    .map(normalizeProject)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 }
 
 export async function saveProject(project: Project): Promise<void> {

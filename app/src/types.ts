@@ -8,16 +8,21 @@ export interface StageSchedule {
 export interface Stage {
   id: string
   name: string
+  /** Whether DJs play sequentially in time slots or simultaneously for the whole event. Defaults to "sequential". */
+  stageType: 'sequential' | 'simultaneous'
   activeDays: string[]
-  /** Per-day schedule. Key is the day name (e.g. "Friday"). */
+  /** Per-day schedule. Key is the day name (e.g. "Friday"). Only used for sequential stages. */
   schedule: Record<string, StageSchedule>
-  slotDuration: number // minutes
+  slotDuration: number // minutes (sequential stages only)
 }
 
 export interface SlotAssignment {
   stageId: string
   evening: string
-  slotIndex: number
+  /** Time-slot index for sequential stage assignments. Omitted for simultaneous assignments. */
+  slotIndex?: number
+  /** Position index (1–3) for simultaneous stage assignments. Omitted for sequential assignments. */
+  positionIndex?: 1 | 2 | 3
   djName: string
 }
 

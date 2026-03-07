@@ -21,6 +21,9 @@ function minutesToTime(totalMinutes: number): string {
  * Returns [] if the stage has no schedule configured for that evening.
  */
 export function getSlotLabels(stage: Stage, evening: string): string[] {
+  // Simultaneous stages have no slot rows — all DJs play the full event window.
+  if (stage.stageType === 'simultaneous') return []
+
   const daySchedule = stage.schedule?.[evening]
   if (!daySchedule?.startTime || !daySchedule?.endTime || !stage.slotDuration) return []
 
@@ -45,6 +48,8 @@ export function getSlotLabels(stage: Stage, evening: string): string[] {
  * Returns the unified, chronologically sorted time axis for an evening.
  * Formed by the union of slot labels from all active stages on that evening.
  * Times in the early morning (before 06:00) are treated as "next day" for sort order.
+ * Simultaneous stages contribute no slot labels (getSlotLabels returns []) so they
+ * do not affect the time axis — this is intentional and correct.
  */
 export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
   const timeSet = new Set<string>()

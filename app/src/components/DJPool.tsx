@@ -10,7 +10,8 @@ interface Props {
 }
 
 export function DJPool({ submissions, assignments, evening, pendingSlot, onAssign }: Props) {
-  // All DJ names assigned anywhere in the lineup
+  // All DJ names assigned anywhere in the lineup (sequential slotIndex or simultaneous positionIndex).
+  // This assignment-type-agnostic check correctly excludes DJs on silent disco stages too.
   const assignedGlobally = new Set(assignments.map((a) => a.djName))
 
   // DJs available on this evening and not yet assigned anywhere
