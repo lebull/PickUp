@@ -27,6 +27,18 @@ function fmt(n: number | null): string {
   return n === null ? '—' : n.toFixed(2)
 }
 
+const BUCKET_LABELS = ['1st Choice', '2nd Choice', '3rd Choice', '4th / 5th Choice', 'No Preference']
+
+function getPreferenceRank(s: Submission, stage: string): number {
+  const prefs = s.stagePreferences.filter(Boolean)
+  const idx = prefs.indexOf(stage)
+  if (idx === 0) return 0
+  if (idx === 1) return 1
+  if (idx === 2) return 2
+  if (idx === 3 || idx === 4) return 3
+  return 4 // not listed
+}
+
 export function DJSelectionPanel({
   submissions,
   stages,
@@ -38,11 +50,27 @@ export function DJSelectionPanel({
   onClose,
 }: Props) {
   const { appContext, hiddenNames } = useAppPreferences()
-  const [selectedStages, setSelectedStages] = useState<Set<string>>(new Set())
+  const [focusStage, setFocusStage] = useState<string | null>(null)
 
   const isSimultaneous = activeSlot.positionIndex != null
   const stage = stages.find((s) => s.id === activeSlot.stageId)
-  const stageNames = useMemo(() => stages.map((s) => s.name).filter(Boolean), [stages])
+
+  // Derive grouping options from the actual preference values in submissions,
+  // so the labels always match the spreadsheet strings exactly.
+  const prefStageNames = useMemo(() => {
+    const seen = new Set<string>()
+    for (const s of submissions) {
+      for (const p of s.stagePreferences) {
+        if (p) seen.add(p)
+      }
+    }
+    return [...seen].sort()
+  }, [submissions])
+
+  // Reset focus stage whenever the active slot changes
+  useEffect(() => {
+    setFocusStage(null)
+  }, [activeSlot])
 
   // For sequential slots: the currently assigned DJ for this exact slot
   const currentAssignment = isSimultaneous
@@ -65,14 +93,9 @@ export function DJSelectionPanel({
       if (assignedDjNames.has(s.djName)) return false
       // Must be available this evening
       if (!s.daysAvailable.toLowerCase().includes(activeSlot.evening.toLowerCase())) return false
-      // Stage preference filter
-      if (selectedStages.size > 0) {
-        const prefNames = s.stagePreferences.filter(Boolean)
-        if (!prefNames.some((p) => selectedStages.has(p))) return false
-      }
       return true
     })
-  }, [submissions, currentAssignment, assignedDjNames, activeSlot.evening, selectedStages])
+  }, [submissions, currentAssignment, assignedDjNames, activeSlot.evening])
 
   // Sort by active-context score descending
   const sorted = useMemo(() => {
@@ -83,6 +106,16 @@ export function DJSelectionPanel({
     })
   }, [available, appContext])
 
+  // Group by preference rank when a focus stage is set
+  const grouped = useMemo(() => {
+    if (!focusStage) return null
+    const buckets: Submission[][] = [[], [], [], [], []]
+    for (const s of sorted) {
+      buckets[getPreferenceRank(s, focusStage)].push(s)
+    }
+    return buckets
+  }, [sorted, focusStage])
+
   // Close on Escape
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -92,13 +125,8 @@ export function DJSelectionPanel({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
-  function toggleStage(name: string) {
-    setSelectedStages((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
+  function handleFocusStage(name: string) {
+    setFocusStage((prev) => (prev === name ? null : name))
   }
 
   function handleAssign(djName: string) {
@@ -121,6 +149,35 @@ export function DJSelectionPanel({
   function scoreLabel(s: Submission): string {
     if (appContext === 'moonlight') return fmt(s.mlScore.avg)
     return fmt(s.mainScore.avg)
+  }
+
+  function renderCard(s: Submission) {
+    return (
+      <div
+        key={s.djName}
+        className="dj-panel-card"
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('application/dj-name', s.djName)
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        onClick={() => handleAssign(s.djName)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.djName) }}
+        aria-label={`Assign ${djLabel(s)}`}
+      >
+        <span className="dj-col-name">{djLabel(s)}</span>
+        <span className="dj-col-score">{scoreLabel(s)}</span>
+        <span className="dj-col-genre">{s.genre || '—'}</span>
+        {appContext === 'moonlight' && (
+          <span className="dj-col-vibefit">{s.mlVibefit || '—'}</span>
+        )}
+        <span className="dj-col-stages">
+          {s.stagePreferences.filter(Boolean).join(', ') || '—'}
+        </span>
+      </div>
+    )
   }
 
   return (
@@ -165,16 +222,16 @@ export function DJSelectionPanel({
         </div>
       )}
 
-      {/* Stage preference filter */}
-      {stageNames.length > 0 && (
+      {/* Focus-stage selector */}
+      {prefStageNames.length > 0 && (
         <div className="dj-panel-filters">
-          <span className="filter-label">Stage Pref:</span>
-          {stageNames.map((name) => (
+          <span className="filter-label">Focus:</span>
+          {prefStageNames.map((name) => (
             <button
               key={name}
               type="button"
-              className={`day-btn${selectedStages.has(name) ? ' active' : ''}`}
-              onClick={() => toggleStage(name)}
+              className={`day-btn${focusStage === name ? ' active' : ''}`}
+              onClick={() => handleFocusStage(name)}
             >
               {name}
             </button>
@@ -194,37 +251,18 @@ export function DJSelectionPanel({
       {/* DJ list */}
       <div className="dj-panel-list">
         {sorted.length === 0 ? (
-          <p className="dj-panel-empty">No available DJs match the current filters.</p>
-        ) : (
-          sorted.map((s) => {
-            const origIndex = submissions.indexOf(s)
-            return (
-              <div
-                key={s.djName}
-                className="dj-panel-card"
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/dj-name', s.djName)
-                  e.dataTransfer.effectAllowed = 'move'
-                }}
-                onClick={() => handleAssign(s.djName)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.djName) }}
-                aria-label={`Assign ${djLabel(s)}`}
-              >
-                <span className="dj-col-name">{djLabel(s)}</span>
-                <span className="dj-col-score">{scoreLabel(s)}</span>
-                <span className="dj-col-genre">{s.genre || '—'}</span>
-                {appContext === 'moonlight' && (
-                  <span className="dj-col-vibefit">{s.mlVibefit || '—'}</span>
-                )}
-                <span className="dj-col-stages">
-                  {s.stagePreferences.filter(Boolean).join(', ') || '—'}
-                </span>
+          <p className="dj-panel-empty">No available DJs for this slot.</p>
+        ) : grouped ? (
+          grouped.map((bucket, i) =>
+            bucket.length === 0 ? null : (
+              <div key={BUCKET_LABELS[i]} className="dj-panel-group">
+                <div className="dj-panel-group-heading">{BUCKET_LABELS[i]}</div>
+                {bucket.map(renderCard)}
               </div>
             )
-          })
+          )
+        ) : (
+          sorted.map(renderCard)
         )}
       </div>
     </div>

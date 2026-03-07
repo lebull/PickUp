@@ -1546,8 +1546,8 @@ input[type="time"] {
 
 /* ── DJ Selection Panel ──────────────────────────────────── */
 .dj-selection-panel {
-  width: 380px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
   background: #1a1a1a;
   border-left: 1px solid #333;
   display: flex;
@@ -1701,6 +1701,23 @@ input[type="time"] {
   text-align: center;
   padding: 1.5rem 1rem;
   margin: 0;
+}
+
+.dj-panel-group {
+  display: contents;
+}
+
+.dj-panel-group-heading {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #555;
+  background: #141414;
+  border-bottom: 1px solid #222;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 /* Highlight active slot in grid */

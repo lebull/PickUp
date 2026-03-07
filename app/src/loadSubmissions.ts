@@ -17,7 +17,7 @@ export function parseSubmissions(csvText: string): Submission[] {
 
   const COL = buildColIndex(rows[0])
 
-  return rows.slice(1).map((row): Submission => ({
+  const parsed = rows.slice(1).map((row): Submission => ({
     submissionNumber: str(row, COL.SUBMISSION_NUMBER),
     djName: str(row, COL.DJ_NAME),
     furName: str(row, COL.FUR_NAME),
@@ -63,4 +63,12 @@ export function parseSubmissions(csvText: string): Submission[] {
     mainScore: computeMainScore(row, COL),
     mlScore: computeMLScore(row, COL),
   }))
+
+  // Deduplicate by djName — if a DJ submitted more than once, keep the last
+  // (most recent) entry, which contains their updated information.
+  const deduped = new Map<string, Submission>()
+  for (const s of parsed) {
+    deduped.set(s.djName, s)
+  }
+  return [...deduped.values()]
 }
