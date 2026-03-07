@@ -15,14 +15,18 @@
 - [ ] 3.1 Update `SubmissionList` (or `SubmissionsView`) to read `appContext` from `useAppPreferences`
 - [ ] 3.2 Set default sort column to Final Main Score when `appContext === 'standard'`, and Final ML Score when `appContext === 'moonlight'`, both descending
 - [ ] 3.3 When `appContext` changes, reset the sort column and direction to match the new context default
+- [ ] 3.4 Ensure the Genre column remains visible in the submission list as a display-only column with no filter control
 
-## 4. Submission List — Genre and Stage Preference Filters
+## 4. DJ Selection Panel — Replace SlotPicker Modal
 
-- [ ] 4.1 Derive a deduplicated list of genre values from loaded submissions; render multi-select genre filter controls above the table
-- [ ] 4.2 Implement genre filter logic: when genres are selected, only submissions matching at least one selected genre are shown; no selection shows all
-- [ ] 4.3 Derive stage names from the project's configured stages; render multi-select stage preference filter controls
-- [ ] 4.4 Implement stage preference filter logic: when stages are selected, only submissions with at least one matching value in `stagePreferences` are shown; no selection shows all
-- [ ] 4.5 Ensure genre, stage, and day filters compose as an intersection (all active filters must match)
+- [ ] 4.1 Create `src/components/DJSelectionPanel.tsx` — a side panel component that accepts the active slot, submissions, stages, and assignments as props and displays a scored list of available DJs
+- [ ] 4.2 Update `LineupView.tsx` to render the `DJSelectionPanel` beside the `LineupGrid` when a slot is active, instead of opening the `SlotPicker` modal; the layout switches to a two-column split (grid | panel) when a slot is selected
+- [ ] 4.3 Remove or deprecate `SlotPicker.tsx` once the panel is wired up (keep file until panel is confirmed working)
+- [ ] 4.4 The panel list SHALL display: DJ Name (or anonymous ID), active-context score, genre (display only — no filter), stage preferences, and vibefit (moonlight context only)
+- [ ] 4.5 Clicking a DJ card in the panel assigns that DJ to the active slot and closes the panel
+- [ ] 4.6 Implement HTML5 drag-and-drop: DJ cards in the panel SHALL be draggable; slot cells in `LineupGrid` SHALL be drop targets; dropping a DJ card onto a slot SHALL assign that DJ to that slot
+- [ ] 4.7 Add a Stage Preference multi-select filter inside the panel (derives stage names from project configuration); filter logic matches the same intersection rules as the submission list
+- [ ] 4.8 Ensure the panel closes when the user clicks outside it or presses Escape
 
 ## 5. Submission List — Hidden Names
 
