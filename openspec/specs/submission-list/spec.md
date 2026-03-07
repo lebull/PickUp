@@ -78,16 +78,25 @@ The application SHALL allow the user to filter the submission list by one or mor
 - **WHEN** a day button is active
 - **THEN** it SHALL have a visually distinct appearance (e.g., filled background) compared to inactive buttons
 
-### Requirement: Navigate to detail view
-The application SHALL allow the user to click a submission row to open the detail view for that submission.
+### Requirement: Selecting a submission navigates to a detail route
+Clicking a submission row SHALL navigate to a URL-addressable detail view rather than toggling local state. The detail panel URL SHALL be `/project/:id/submissions/:djIndex` where `:djIndex` is the 0-based integer position in the currently rendered (sorted and filtered) list.
 
-#### Scenario: Row click navigates to detail
-- **WHEN** user clicks on any row in the submission list
-- **THEN** the detail view for that submission is displayed
+#### Scenario: Clicking a row navigates to detail URL
+- **WHEN** the user clicks a submission row in the list
+- **THEN** the browser SHALL navigate to `/project/:id/submissions/:djIndex`
+- **THEN** the submission detail panel SHALL be displayed for that submission
 
-#### Scenario: Return to list from detail
-- **WHEN** user clicks the Back button in the detail view
-- **THEN** the list view is displayed again
+#### Scenario: Detail URL is bookmarkable
+- **WHEN** the user copies the detail URL and opens it in a new tab
+- **THEN** the submission detail panel for that index SHALL load directly
+
+#### Scenario: Browser back from detail returns to list
+- **WHEN** the user is viewing a submission detail and presses the browser back button
+- **THEN** the app SHALL return to `/project/:id/submissions` with no detail panel shown
+
+#### Scenario: Back button in detail panel navigates back
+- **WHEN** the user clicks the back/close control within the submission detail panel
+- **THEN** the app SHALL navigate back to `/project/:id/submissions`
 
 ### Requirement: Submission list pool view in Lineup Builder
 When the Lineup Builder mode is active, the submission list SHALL be accessible as a read-only reference panel (the "pool") showing unscheduled DJs for the currently selected evening. This is separate from the full Submission Browser tab.

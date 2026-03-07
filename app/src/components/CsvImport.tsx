@@ -3,7 +3,7 @@ import { parseSubmissions } from '../loadSubmissions.ts'
 import type { Submission } from '../types.ts'
 
 interface Props {
-  onImport: (submissions: Submission[], fileName: string) => void
+  onImport: (submissions: Submission[], fileName: string, csvText: string) => void
 }
 
 export function CsvImport({ onImport }: Props) {
@@ -15,7 +15,7 @@ export function CsvImport({ onImport }: Props) {
       const text = await file.text()
       const submissions = parseSubmissions(text)
       setError(null)
-      onImport(submissions, file.name)
+      onImport(submissions, file.name, text)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to parse CSV')
     }

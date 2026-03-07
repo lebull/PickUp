@@ -1099,3 +1099,200 @@ input[type="time"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Project management ─────────────────────────────────────────────────── */
+
+.app-title {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #e8e8e8;
+}
+
+.project-title {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #e8e8e8;
+}
+
+.back-link {
+  color: #888;
+  font-size: 0.875rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.back-link:hover {
+  color: #ccc;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.project-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Project list page */
+.project-list-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.project-list-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #1a1a1a;
+  border: 1px solid #2e2e2e;
+  border-radius: 6px;
+}
+
+.project-list-item__name {
+  background: none;
+  border: none;
+  color: #e8e8e8;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.project-list-item__name:hover {
+  color: #4a90d9;
+}
+
+.project-list-item__meta {
+  color: #666;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.project-list-item__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Project create page */
+.project-create-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.project-create-form {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-label {
+  color: #aaa;
+  font-size: 0.875rem;
+}
+
+.form-input {
+  padding: 0.5rem 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #e8e8e8;
+  font-size: 1rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.form-error {
+  color: #e05a5a;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Empty state / loading */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 1rem;
+  color: #888;
+}
+
+.empty-state-message {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.loading-message {
+  color: #666;
+  text-align: center;
+  margin-top: 4rem;
+}
+
+/* Buttons */
+.btn-primary {
+  padding: 0.45rem 1rem;
+  background: #4a90d9;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-primary:hover {
+  background: #5aa0e9;
+}
+
+.btn-secondary {
+  padding: 0.45rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #333;
+  border-color: #666;
+}

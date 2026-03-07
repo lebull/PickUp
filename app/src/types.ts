@@ -27,9 +27,19 @@ export interface LineupState {
   rowCount: number
 }
 
+export interface Project {
+  id: string
+  name: string
+  csvText: string
+  stages: Stage[]
+  assignments: SlotAssignment[]
+  rowCount: number
+  createdAt: string  // ISO timestamp
+  updatedAt: string  // ISO timestamp
+}
+
 export interface Submission {
   // identity
-  submissionNumber?: string,
   djName: string
   furName: string
   contactEmail: string
@@ -60,6 +70,10 @@ export interface Submission {
   j2Flow: number | null
   j2Entertainment: number | null
   j2Notes: string
+  j3Technical: number | null
+  j3Flow: number | null
+  j3Entertainment: number | null
+  j3Notes: string
   mlTechnical: number | null
   mlFlow: number | null
   mlEntertainment: number | null

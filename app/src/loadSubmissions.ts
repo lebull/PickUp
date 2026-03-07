@@ -1,5 +1,5 @@
 import Papa from 'papaparse'
-import { COL, validateHeaders } from './csvColumns.ts'
+import { buildColIndex } from './csvColumns.ts'
 import { parseScore, computeMainScore, computeMLScore } from './scoreCalculation.ts'
 import type { Submission } from './types.ts'
 
@@ -15,10 +15,9 @@ export function parseSubmissions(csvText: string): Submission[] {
   const rows = result.data as string[][]
   if (rows.length < 2) return []
 
-  validateHeaders(rows[0])
+  const COL = buildColIndex(rows[0])
 
   return rows.slice(1).map((row): Submission => ({
-    submissionNumber: str(row, COL.SUBMISSION_NUMBER),
     djName: str(row, COL.DJ_NAME),
     furName: str(row, COL.FUR_NAME),
     contactEmail: str(row, COL.CONTACT_EMAIL),
@@ -51,12 +50,16 @@ export function parseSubmissions(csvText: string): Submission[] {
     j2Flow: parseScore(row[COL.J2_FLOW]),
     j2Entertainment: parseScore(row[COL.J2_ENTERTAINMENT]),
     j2Notes: str(row, COL.J2_NOTES),
+    j3Technical: parseScore(row[COL.J3_TECHNICAL]),
+    j3Flow: parseScore(row[COL.J3_FLOW]),
+    j3Entertainment: parseScore(row[COL.J3_ENTERTAINMENT]),
+    j3Notes: str(row, COL.J3_NOTES),
     mlTechnical: parseScore(row[COL.ML_TECHNICAL]),
     mlFlow: parseScore(row[COL.ML_FLOW]),
     mlEntertainment: parseScore(row[COL.ML_ENTERTAINMENT]),
     mlVibefit: str(row, COL.ML_VIBEFIT),
-    mlNotes: [str(row, COL.ML_NOTES), str(row, COL.ML_NOTES_2)].filter(Boolean).join(' / '),
-    mainScore: computeMainScore(row),
-    mlScore: computeMLScore(row),
+    mlNotes: str(row, COL.ML_NOTES),
+    mainScore: computeMainScore(row, COL),
+    mlScore: computeMLScore(row, COL),
   }))
 }

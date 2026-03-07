@@ -120,7 +120,7 @@ export function SubmissionList({
             const origIndex = submissions.indexOf(s)
             return (
               <tr key={origIndex} onClick={() => onSelect(origIndex)} className="submission-row">
-                <td>{s.submissionNumber}</td>
+                <td>{origIndex + 1}</td>
                 <td>{s.djName}</td>
                 <td>
                   {displayScore(s, 'main', scoreMetric)}

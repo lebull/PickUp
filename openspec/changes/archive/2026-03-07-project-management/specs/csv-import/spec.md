@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Import CSV button
 The application SHALL provide a visible "Import CSV" button within an active project's workspace that opens a native file picker restricted to `.csv` files.
@@ -41,3 +41,13 @@ The application SHALL display an inline error message near the import button whe
 #### Scenario: Successful import clears any previous error
 - **WHEN** a previously failed import is followed by a successful import
 - **THEN** the error message is cleared and the new data is displayed
+
+## REMOVED Requirements
+
+### Requirement: Drag-and-drop import on empty state
+**Reason**: The empty-state concept no longer applies at the app level — the Project List view is now the app entry point. Within a project, the workspace is always shown regardless of CSV state. Drag-and-drop can be reconsidered as a UX enhancement in a future change.
+**Migration**: Use the "Import CSV" button within a project to load submissions.
+
+### Requirement: Page title reflects imported filename
+**Reason**: The app now displays the project name as the active context heading. The CSV filename is no longer the primary identifier.
+**Migration**: The project name is shown in the workspace header instead.

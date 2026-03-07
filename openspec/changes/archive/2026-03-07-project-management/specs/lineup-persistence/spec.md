@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Persist lineup state to a project
 The application SHALL save the complete lineup state — stage configuration and all slot assignments — to the active project's IndexedDB record automatically whenever state changes. The record SHALL be keyed by the project's UUID, not the CSV filename.
