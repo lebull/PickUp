@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProjectContext } from '../ProjectContext.ts'
 import { SubmissionList } from './SubmissionList.tsx'
@@ -26,18 +26,27 @@ function SubmissionDetailRoute() {
 }
 
 export function SubmissionsView() {
-  const { submissions } = useProjectContext()
-  const { djIndex } = useParams<{ djIndex: string }>()
+  const { project, submissions } = useProjectContext()
+  const { id: projectId, djIndex } = useParams<{ id: string; djIndex: string }>()
   const navigate = useNavigate()
+  const listRef = useRef<HTMLDivElement>(null)
 
   const [sortField, setSortField] = useState<SortField>(null)
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [scoreMetric, setScoreMetric] = useState<ScoreMetric>('avg')
   const [activeDays, setActiveDays] = useState<Set<string>>(new Set())
+  const [cursorIndex, setCursorIndex] = useState<number | null>(null)
 
   if (submissions === null) return null
 
   const hasSelection = djIndex !== undefined
+
+  // Derive lineup submission numbers from project assignments
+  const lineupSubmissionNumbers = new Set(
+    project.assignments
+      .map((a) => submissions.find((s) => s.djName === a.djName)?.submissionNumber)
+      .filter((n): n is string => n !== undefined)
+  )
 
   function handleHeaderClick(field: SortField) {
     if (field === sortField) {
@@ -57,23 +66,33 @@ export function SubmissionsView() {
     })
   }
 
-  function handleSelect(index: number) {
-    navigate(String(index))
+  function handleSelect(index: number, displayedIndex: number) {
+    setCursorIndex(displayedIndex)
+    navigate(`/project/${projectId}/submissions/${index}`)
+    listRef.current?.focus()
   }
 
   return (
     <div className={`split-layout${hasSelection ? ' has-selection' : ''}`}>
-      <div className="split-list">
+      <div
+        className="split-list"
+        ref={listRef}
+        tabIndex={0}
+      >
         <SubmissionList
           submissions={submissions}
           sortField={sortField}
           sortDir={sortDir}
           scoreMetric={scoreMetric}
           activeDays={activeDays}
+          cursorIndex={cursorIndex}
+          lineupSubmissionNumbers={lineupSubmissionNumbers}
           onHeaderClick={handleHeaderClick}
           onMetricChange={setScoreMetric}
           onDayToggle={handleDayToggle}
           onSelect={handleSelect}
+          onCursorChange={setCursorIndex}
+          listRef={listRef}
         />
       </div>
       <div className="split-detail">

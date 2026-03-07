@@ -40,6 +40,7 @@ export interface Project {
 
 export interface Submission {
   // identity
+  submissionNumber: string
   djName: string
   furName: string
   contactEmail: string

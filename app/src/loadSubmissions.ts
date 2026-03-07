@@ -18,6 +18,7 @@ export function parseSubmissions(csvText: string): Submission[] {
   const COL = buildColIndex(rows[0])
 
   return rows.slice(1).map((row): Submission => ({
+    submissionNumber: str(row, COL.SUBMISSION_NUMBER),
     djName: str(row, COL.DJ_NAME),
     furName: str(row, COL.FUR_NAME),
     contactEmail: str(row, COL.CONTACT_EMAIL),

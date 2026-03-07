@@ -5,6 +5,7 @@
  * provide enough context to uniquely identify the right one.
  */
 export const COL_HEADERS = {
+  SUBMISSION_NUMBER:  'Submission #',
   TIMESTAMP:          'Timestamp',
   EMAIL:              'Email Address',
   DJ_NAME:            'DJ Name',

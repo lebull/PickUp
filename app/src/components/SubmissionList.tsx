@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
+import type { RefObject } from 'react'
 import type { Submission } from '../types.ts'
 
 export type SortField = 'main' | 'ml' | null
@@ -29,10 +30,14 @@ interface Props {
   sortDir: SortDir
   scoreMetric: ScoreMetric
   activeDays: Set<string>
+  cursorIndex: number | null
+  lineupSubmissionNumbers: Set<string>
+  listRef: RefObject<HTMLDivElement | null>
   onHeaderClick: (field: SortField) => void
   onMetricChange: (metric: ScoreMetric) => void
   onDayToggle: (day: string) => void
-  onSelect: (index: number) => void
+  onSelect: (origIndex: number, displayedIndex: number) => void
+  onCursorChange: (index: number | null) => void
 }
 
 export function SubmissionList({
@@ -41,10 +46,14 @@ export function SubmissionList({
   sortDir,
   scoreMetric,
   activeDays,
+  cursorIndex,
+  lineupSubmissionNumbers,
+  listRef,
   onHeaderClick,
   onMetricChange,
   onDayToggle,
   onSelect,
+  onCursorChange,
 }: Props) {
   const filtered = useMemo(() => {
     if (activeDays.size === 0) return submissions
@@ -64,6 +73,30 @@ export function SubmissionList({
       return sortDir === 'desc' ? sb - sa : sa - sb
     })
   }, [filtered, sortField, sortDir, scoreMetric])
+
+  // Keyboard navigation handler attached to the list container
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (sorted.length === 0) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        onCursorChange(Math.min((cursorIndex ?? -1) + 1, sorted.length - 1))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        onCursorChange(Math.max((cursorIndex ?? sorted.length) - 1, 0))
+      } else if ((e.key === 'Enter' || e.key === ' ') && cursorIndex !== null) {
+        e.preventDefault()
+        const s = sorted[cursorIndex]
+        if (s) onSelect(submissions.indexOf(s), cursorIndex)
+      }
+    }
+
+    el.addEventListener('keydown', onKeyDown)
+    return () => el.removeEventListener('keydown', onKeyDown)
+  }, [listRef, sorted, cursorIndex, submissions, onCursorChange, onSelect])
 
   function arrow(field: 'main' | 'ml') {
     if (sortField !== field) return <span className="sort-arrow" aria-hidden> </span>
@@ -93,48 +126,64 @@ export function SubmissionList({
           ))}
         </div>
       </div>
-      <table className="submission-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>DJ Name</th>
-            <th
-              className={`th-sortable${sortField === 'main' ? ' th-active' : ''}`}
-              onClick={() => onHeaderClick('main')}
-            >
-              Main Score {arrow('main')}
-            </th>
-            <th
-              className={`th-sortable${sortField === 'ml' ? ' th-active' : ''}`}
-              onClick={() => onHeaderClick('ml')}
-            >
-              ML Score {arrow('ml')}
-            </th>
-            <th>Genre</th>
-            <th>Preferred Stages</th>
-            <th>Days Available</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((s) => {
-            const origIndex = submissions.indexOf(s)
-            return (
-              <tr key={origIndex} onClick={() => onSelect(origIndex)} className="submission-row">
-                <td>{origIndex + 1}</td>
-                <td>{s.djName}</td>
-                <td>
-                  {displayScore(s, 'main', scoreMetric)}
-                  {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored">*</span>}
-                </td>
-                <td>{displayScore(s, 'ml', scoreMetric)}</td>
-                <td>{s.genre || '—'}</td>
-                <td>{s.stagePreferences.join(', ') || '—'}</td>
-                <td>{s.daysAvailable || '—'}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      <div className="submission-table-wrapper">
+        <table className="submission-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>DJ Name</th>
+              <th
+                className={`th-sortable${sortField === 'main' ? ' th-active' : ''}`}
+                onClick={() => onHeaderClick('main')}
+              >
+                Main Score {arrow('main')}
+              </th>
+              <th
+                className={`th-sortable${sortField === 'ml' ? ' th-active' : ''}`}
+                onClick={() => onHeaderClick('ml')}
+              >
+                ML Score {arrow('ml')}
+              </th>
+              <th>Genre</th>
+              <th>Preferred Stages</th>
+              <th>Days Available</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((s, displayedIndex) => {
+              const origIndex = submissions.indexOf(s)
+              const inLineup = lineupSubmissionNumbers.has(s.submissionNumber)
+              const isCursor = cursorIndex === displayedIndex
+              const rowClass = [
+                'submission-row',
+                inLineup ? 'in-lineup' : '',
+                isCursor ? 'row-cursor' : '',
+              ].filter(Boolean).join(' ')
+              return (
+                <tr
+                  key={origIndex}
+                  className={rowClass}
+                  onClick={() => onSelect(origIndex, displayedIndex)}
+                >
+                  <td>{origIndex + 1}</td>
+                  <td>
+                    {s.djName}
+                    {inLineup && <span className="lineup-badge">✓ In Lineup</span>}
+                  </td>
+                  <td>
+                    {displayScore(s, 'main', scoreMetric)}
+                    {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored">*</span>}
+                  </td>
+                  <td>{displayScore(s, 'ml', scoreMetric)}</td>
+                  <td>{s.genre || '—'}</td>
+                  <td>{s.stagePreferences.join(', ') || '—'}</td>
+                  <td>{s.daysAvailable || '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
       {sorted.length === 0 && (
         <p className="empty-state">No submissions match the current filter.</p>
       )}

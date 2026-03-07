@@ -12,6 +12,35 @@ function rawScore(n: number | null): string {
   return n === null ? '—' : String(n)
 }
 
+interface SummaryProps {
+  submission: Submission
+}
+
+function SubmissionSummary({ submission: s }: SummaryProps) {
+  const mlScore = s.moonlightInterest && s.mlScore.avg !== null
+    ? s.mlScore.avg.toFixed(2)
+    : '—'
+  return (
+    <div className="detail-summary">
+      <div className="detail-summary-item">
+        <span className="detail-summary-label">Main Score</span>
+        <span className="detail-summary-value">
+          {numVal(s.mainScore.avg)}
+          {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored"> *</span>}
+        </span>
+      </div>
+      <div className="detail-summary-item">
+        <span className="detail-summary-label">ML Score</span>
+        <span className="detail-summary-value">{mlScore}</span>
+      </div>
+      <div className="detail-summary-item">
+        <span className="detail-summary-label">Genre</span>
+        <span className="detail-summary-value">{val(s.genre)}</span>
+      </div>
+    </div>
+  )
+}
+
 interface SectionProps {
   title: string
   children: React.ReactNode
@@ -54,6 +83,8 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
       <button type="button" className="back-button" onClick={onBack}>← Back</button>
 
       <h1 className="detail-title">{s.djName}</h1>
+
+      <SubmissionSummary submission={s} />
 
       <Section title="Basic Info">
         <Field label="DJ Name" value={val(s.djName)} />
