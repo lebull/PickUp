@@ -10,6 +10,8 @@ import { SubmissionsView } from './components/SubmissionsView.tsx'
 import { LineupView } from './components/LineupView.tsx'
 import { getProject, saveProject, exportProject } from './projectStore.ts'
 import { ProjectContext } from './ProjectContext.ts'
+import { AppPreferencesContext, useAppPreferencesState } from './AppPreferencesContext.ts'
+import { AppPreferencesControls } from './components/AppPreferencesControls.tsx'
 
 // ── Project Workspace ────────────────────────────────────────────────────────
 
@@ -121,6 +123,7 @@ function ProjectWorkspace() {
             </nav>
           )}
           <div className="header-actions">
+            <AppPreferencesControls />
             <button
               type="button"
               className="btn-secondary btn-small"
@@ -151,17 +154,20 @@ function ProjectWorkspace() {
 // ── App (routes) ─────────────────────────────────────────────────────────────
 
 function App() {
+  const prefs = useAppPreferencesState()
   return (
-    <Routes>
-      <Route path="/" element={<ProjectList />} />
-      <Route path="/new" element={<ProjectCreate />} />
-      <Route path="/project/:id" element={<ProjectWorkspace />}>
-        <Route index element={<Navigate replace to="submissions" />} />
-        <Route path="submissions" element={<SubmissionsView />} />
-        <Route path="submissions/:djIndex" element={<SubmissionsView />} />
-        <Route path="lineup" element={<LineupView />} />
-      </Route>
-    </Routes>
+    <AppPreferencesContext.Provider value={prefs}>
+      <Routes>
+        <Route path="/" element={<ProjectList />} />
+        <Route path="/new" element={<ProjectCreate />} />
+        <Route path="/project/:id" element={<ProjectWorkspace />}>
+          <Route index element={<Navigate replace to="submissions" />} />
+          <Route path="submissions" element={<SubmissionsView />} />
+          <Route path="submissions/:djIndex" element={<SubmissionsView />} />
+          <Route path="lineup" element={<LineupView />} />
+        </Route>
+      </Routes>
+    </AppPreferencesContext.Provider>
   )
 }
 

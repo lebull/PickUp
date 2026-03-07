@@ -1,11 +1,11 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Display all submission fields in detail view
-The detail view SHALL display all available fields for a selected submission, organized into logical sections.
+The detail view SHALL display all available fields for a selected submission, organized into logical sections. When Hidden Names mode is active, the DJ Name heading and Fur Name field SHALL be replaced with the anonymous identifier and "—" respectively. When the active app context is Moonlight, the Moonlight score section SHALL be shown prominently at the top.
 
 #### Scenario: Basic info section shown
 - **WHEN** a submission detail view is open
-- **THEN** the following fields SHALL be visible: DJ Name, Fur Name, Contact Email, Telegram/Discord, Social Media, Phone Number, Submission Link, Genre, Format/Gear, Bio, Days Available, Prior Experience
+- **THEN** the following fields SHALL be visible: DJ Name (or anonymous ID), Fur Name (or "—" when Hidden Names active), Contact Email, Telegram/Discord, Social Media, Phone Number, Submission Link, Genre, Format/Gear, Bio, Days Available, Prior Experience
 
 #### Scenario: Stage preferences section shown
 - **WHEN** a submission detail view is open
@@ -26,6 +26,16 @@ The detail view SHALL display all available fields for a selected submission, or
 #### Scenario: Empty fields handled gracefully
 - **WHEN** a field in the CSV is empty for a submission
 - **THEN** the detail view SHALL display "—" or omit the field rather than showing blank space or "undefined"
+
+#### Scenario: Active Moonlight context elevates ML score section
+- **WHEN** a submission detail view is open and the active app context is Moonlight
+- **THEN** the Moonlight score section SHALL appear at the top of the detail view, above the Main score section
+- **THEN** the ML Score summary value SHALL be displayed prominently in the summary banner
+
+#### Scenario: Hidden Names mode masks name fields in detail view
+- **WHEN** `hiddenNames` is true and a submission detail view is open
+- **THEN** the DJ Name heading SHALL display the anonymous identifier (`DJ #N`)
+- **THEN** the Fur Name field SHALL display "—"
 
 ### Requirement: Summary section at top of submission detail view
 The submission detail view SHALL display a compact summary section immediately after the DJ name heading and before any detailed sections. The summary SHALL include the Final Main Score, Final Moonlight Score (or an em dash if not applicable), and Genre.

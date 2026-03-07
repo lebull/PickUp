@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import { getSlotLabels, getEveningTimeAxis } from '../lineupUtils.ts'
-import { SlotPicker } from './SlotPicker'
 
 interface Props {
   submissions: Submission[]
@@ -12,20 +11,11 @@ interface Props {
   onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, djName: string) => void
   onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3) => void
   onConfigureStages: () => void
-}
-
-interface ActiveSlot {
-  stageId: string
-  evening: string
-  slotIndex: number
-  timeLabel: string
-}
-
-/** Pending simultaneous assignment — which stage+evening+position we're filling. */
-interface PendingSimultaneous {
-  stageId: string
-  evening: string
-  positionIndex: 1 | 2 | 3
+  /** Called when a sequential slot cell is clicked; parent owns the active slot state. */
+  onSlotClick: (slot: { stageId: string; evening: string; slotIndex: number; timeLabel: string }) => void
+  /** Called when an "Add DJ" button on a simultaneous cell is clicked; parent owns the active slot state. */
+  onSimultaneousClick: (slot: { stageId: string; evening: string; positionIndex: 1 | 2 | 3; timeLabel: string }) => void
+  activeSlotKey: string | null // "stageId|evening|slotIndex" used to highlight
 }
 
 export function LineupGrid({
@@ -37,6 +27,9 @@ export function LineupGrid({
   onAddSimultaneous,
   onRemoveSimultaneous,
   onConfigureStages,
+  onSlotClick,
+  onSimultaneousClick,
+  activeSlotKey,
 }: Props) {
   const activeEvenings = useMemo(() => {
     const daySet = new Set<string>()
@@ -47,8 +40,6 @@ export function LineupGrid({
   }, [stages])
 
   const [selectedEvening, setSelectedEvening] = useState<string>(() => activeEvenings[0] ?? '')
-  const [activeSlot, setActiveSlot] = useState<ActiveSlot | null>(null)
-  const [pendingSimultaneous, setPendingSimultaneous] = useState<PendingSimultaneous | null>(null)
 
   const evening = activeEvenings.includes(selectedEvening)
     ? selectedEvening
@@ -177,7 +168,7 @@ export function LineupGrid({
                     nextPosition={nextSimultaneousPosition(stage.id)}
                     onAddClick={() => {
                       const pos = nextSimultaneousPosition(stage.id)
-                      if (pos) setPendingSimultaneous({ stageId: stage.id, evening, positionIndex: pos })
+                      if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
                     }}
                     onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
                     rowSpan={1}
@@ -219,7 +210,7 @@ export function LineupGrid({
                           nextPosition={nextSimultaneousPosition(stage.id)}
                           onAddClick={() => {
                             const pos = nextSimultaneousPosition(stage.id)
-                            if (pos) setPendingSimultaneous({ stageId: stage.id, evening, positionIndex: pos })
+                            if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
                           }}
                           onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
                           rowSpan={timeAxis.length}
@@ -253,14 +244,22 @@ export function LineupGrid({
                   }
 
                   const assignment = getAssignment(stage.id, slotIndex)
+                  const slotKey = `${stage.id}|${evening}|${slotIndex}`
+                  const isActive = activeSlotKey === slotKey
                   return assignment ? (
                     <button
                       key={`${stage.id}-${timeLabel}`}
                       type="button"
-                      className="grid-cell grid-slot grid-slot--occupied"
+                      className={`grid-cell grid-slot grid-slot--occupied${isActive ? ' grid-slot--active' : ''}`}
                       onClick={() =>
-                        setActiveSlot({ stageId: stage.id, evening, slotIndex, timeLabel })
+                        onSlotClick({ stageId: stage.id, evening, slotIndex, timeLabel })
                       }
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const djName = e.dataTransfer.getData('application/dj-name')
+                        if (djName) onAssign(stage.id, evening, slotIndex, djName)
+                      }}
                     >
                       {assignment.djName}
                     </button>
@@ -268,10 +267,16 @@ export function LineupGrid({
                     <button
                       key={`${stage.id}-${timeLabel}`}
                       type="button"
-                      className="grid-cell grid-slot grid-slot--empty"
+                      className={`grid-cell grid-slot grid-slot--empty${isActive ? ' grid-slot--active' : ''}`}
                       onClick={() =>
-                        setActiveSlot({ stageId: stage.id, evening, slotIndex, timeLabel })
+                        onSlotClick({ stageId: stage.id, evening, slotIndex, timeLabel })
                       }
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const djName = e.dataTransfer.getData('application/dj-name')
+                        if (djName) onAssign(stage.id, evening, slotIndex, djName)
+                      }}
                     >
                       +
                     </button>
@@ -282,37 +287,6 @@ export function LineupGrid({
         </div>
       )}
 
-      {/* Sequential slot picker */}
-      {activeSlot && (
-        <SlotPicker
-          submissions={submissions}
-          stages={stages}
-          assignments={assignments}
-          activeSlot={activeSlot}
-          onAssign={onAssign}
-          onRemove={onRemove}
-          onClose={() => setActiveSlot(null)}
-        />
-      )}
-
-      {/* Simultaneous DJ picker — reuses SlotPicker's available-DJ list via a thin adapter */}
-      {pendingSimultaneous && (
-        <SimultaneousPicker
-          submissions={submissions}
-          assignments={assignments}
-          pending={pendingSimultaneous}
-          onAssign={(djName) => {
-            onAddSimultaneous(
-              pendingSimultaneous.stageId,
-              pendingSimultaneous.evening,
-              pendingSimultaneous.positionIndex,
-              djName
-            )
-            setPendingSimultaneous(null)
-          }}
-          onClose={() => setPendingSimultaneous(null)}
-        />
-      )}
     </div>
   )
 }
@@ -361,60 +335,6 @@ function SimultaneousCell({
             + Add DJ
           </button>
         )}
-      </div>
-    </div>
-  )
-}
-
-// ── SimultaneousPicker ────────────────────────────────────────────────────────
-
-interface SimultaneousPickerProps {
-  submissions: Submission[]
-  assignments: SlotAssignment[]
-  pending: PendingSimultaneous
-  onAssign: (djName: string) => void
-  onClose: () => void
-}
-
-function SimultaneousPicker({
-  submissions,
-  assignments,
-  pending,
-  onAssign,
-  onClose,
-}: SimultaneousPickerProps) {
-  // Pool exclusion is assignment-type-agnostic: covers both slotIndex and positionIndex assignments.
-  const assignedGlobally = new Set(assignments.map((a) => a.djName))
-  const available = submissions.filter(
-    (s) =>
-      !assignedGlobally.has(s.djName) &&
-      s.daysAvailable.toLowerCase().includes(pending.evening.toLowerCase())
-  )
-
-  return (
-    <div className="slot-picker-overlay" onClick={onClose}>
-      <div className="slot-picker" onClick={(e) => e.stopPropagation()}>
-        <div className="slot-picker-header">
-          <span>Silent Disco — {pending.evening} · Position {pending.positionIndex}</span>
-          <button type="button" className="close-btn" onClick={onClose}>✕</button>
-        </div>
-        <div className="slot-picker-list">
-          {available.length === 0 ? (
-            <p className="slot-picker-empty">No available DJs for this evening.</p>
-          ) : (
-            available.map((s) => (
-              <button
-                key={s.djName}
-                type="button"
-                className="slot-picker-dj"
-                onClick={() => onAssign(s.djName)}
-              >
-                {s.djName}
-                {s.genre && <span className="slot-picker-genre">{s.genre}</span>}
-              </button>
-            ))
-          )}
-        </div>
       </div>
     </div>
   )

@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProjectContext } from '../ProjectContext.ts'
 import { SubmissionList } from './SubmissionList.tsx'
 import type { SortField, SortDir, ScoreMetric } from './SubmissionList.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
+import { useAppPreferences } from '../AppPreferencesContext.ts'
 
 function SubmissionDetailRoute() {
   const { djIndex } = useParams<{ djIndex: string }>()
@@ -30,12 +31,21 @@ export function SubmissionsView() {
   const { id: projectId, djIndex } = useParams<{ id: string; djIndex: string }>()
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
+  const { appContext, hiddenNames } = useAppPreferences()
 
-  const [sortField, setSortField] = useState<SortField>(null)
+  const [sortField, setSortField] = useState<SortField>(() =>
+    appContext === 'moonlight' ? 'ml' : 'main'
+  )
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [scoreMetric, setScoreMetric] = useState<ScoreMetric>('avg')
   const [activeDays, setActiveDays] = useState<Set<string>>(new Set())
   const [cursorIndex, setCursorIndex] = useState<number | null>(null)
+
+  // Reset sort to active context score when appContext changes
+  useEffect(() => {
+    setSortField(appContext === 'moonlight' ? 'ml' : 'main')
+    setSortDir('desc')
+  }, [appContext])
 
   if (submissions === null) return null
 
@@ -87,6 +97,8 @@ export function SubmissionsView() {
           activeDays={activeDays}
           cursorIndex={cursorIndex}
           lineupSubmissionNumbers={lineupSubmissionNumbers}
+          hiddenNames={hiddenNames}
+          appContext={appContext}
           onHeaderClick={handleHeaderClick}
           onMetricChange={setScoreMetric}
           onDayToggle={handleDayToggle}

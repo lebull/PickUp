@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import type { RefObject } from 'react'
 import type { Submission } from '../types.ts'
+import type { AppContextMode } from '../AppPreferencesContext.ts'
 
 export type SortField = 'main' | 'ml' | null
 export type SortDir = 'asc' | 'desc'
@@ -32,6 +33,8 @@ interface Props {
   activeDays: Set<string>
   cursorIndex: number | null
   lineupSubmissionNumbers: Set<string>
+  hiddenNames: boolean
+  appContext: AppContextMode
   listRef: RefObject<HTMLDivElement | null>
   onHeaderClick: (field: SortField) => void
   onMetricChange: (metric: ScoreMetric) => void
@@ -48,6 +51,8 @@ export function SubmissionList({
   activeDays,
   cursorIndex,
   lineupSubmissionNumbers,
+  hiddenNames,
+  appContext,
   listRef,
   onHeaderClick,
   onMetricChange,
@@ -147,6 +152,7 @@ export function SubmissionList({
               <th>Genre</th>
               <th>Preferred Stages</th>
               <th>Days Available</th>
+              {appContext === 'moonlight' && <th>Vibefit</th>}
             </tr>
           </thead>
           <tbody>
@@ -167,7 +173,7 @@ export function SubmissionList({
                 >
                   <td>{origIndex + 1}</td>
                   <td>
-                    {s.djName}
+                    {hiddenNames ? `DJ #${origIndex + 1}` : s.djName}
                     {inLineup && <span className="lineup-badge">✓ In Lineup</span>}
                   </td>
                   <td>
@@ -178,6 +184,7 @@ export function SubmissionList({
                   <td>{s.genre || '—'}</td>
                   <td>{s.stagePreferences.join(', ') || '—'}</td>
                   <td>{s.daysAvailable || '—'}</td>
+                  {appContext === 'moonlight' && <td>{s.mlVibefit || '—'}</td>}
                 </tr>
               )
             })}
