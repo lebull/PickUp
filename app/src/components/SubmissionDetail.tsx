@@ -21,7 +21,7 @@ interface SummaryProps {
   anonymousLabel: string
 }
 
-function SubmissionSummary({ submission: s, appContext, anonymousLabel }: SummaryProps) {
+function SubmissionSummary({ submission: s, appContext, anonymousLabel: _anonymousLabel }: SummaryProps) {
   const mlScore = s.moonlightInterest && s.mlScore.avg !== null
     ? s.mlScore.avg.toFixed(2)
     : '—'

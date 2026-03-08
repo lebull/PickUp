@@ -49,19 +49,20 @@ function ProjectWorkspace() {
         }
       }
       // Migrate legacy djName-keyed assignments to submissionNumber
-      if (subs && p.assignments.some((a) => !('submissionNumber' in a))) {
+      if (subs && p.assignments.some((a) => !('submissionNumber' in (a as object)))) {
         const migrated = p.assignments
           .map((a) => {
-            if ('submissionNumber' in a) return a as typeof a & { submissionNumber: string }
-            const legacy = a as unknown as { djName: string } & typeof a
+            const aAny = a as unknown as Record<string, unknown>
+            if ('submissionNumber' in aAny) return a
+            const legacy = aAny as { djName: string } & Record<string, unknown>
             const match = subs!.find((s) => s.djName === legacy.djName)
             if (!match) {
-              console.warn(`[migration] Could not resolve legacy assignment for djName="${legacy.djName}" — dropping`)
+              console.warn(`[migration] Could not resolve legacy assignment for djName="${String(legacy.djName)}" — dropping`)
               return null
             }
-            const { djName: _dropped, ...rest } = legacy as Record<string, unknown>
+            const { djName: _dropped, ...rest } = legacy
             void _dropped
-            return { ...rest, submissionNumber: match.submissionNumber } as typeof a & { submissionNumber: string }
+            return { ...rest, submissionNumber: match.submissionNumber } as typeof a
           })
           .filter((a): a is NonNullable<typeof a> => a !== null)
         p = { ...p, assignments: migrated }

@@ -32,13 +32,13 @@ export function SlotPicker({
       a.slotIndex === activeSlot.slotIndex
   )
 
-  // DJs already assigned anywhere in the lineup (globally)
-  const assignedDjNames = new Set(assignments.map((a) => a.djName))
+  // Submissions already assigned anywhere in the lineup (globally)
+  const assignedNumbers = new Set(assignments.map((a) => a.submissionNumber))
 
   // Available pool: available on this evening, not assigned anywhere
   const available = submissions.filter((s) => {
-    if (currentAssignment && s.djName === currentAssignment.djName) return false
-    if (assignedDjNames.has(s.djName)) return false
+    if (currentAssignment && s.submissionNumber === currentAssignment.submissionNumber) return false
+    if (assignedNumbers.has(s.submissionNumber)) return false
     return s.daysAvailable.toLowerCase().includes(activeSlot.evening.toLowerCase())
   })
 
@@ -54,7 +54,7 @@ export function SlotPicker({
 
         {currentAssignment && (
           <div className="slot-picker-current">
-            <span>Currently: <strong>{currentAssignment.djName}</strong></span>
+            <span>Currently: <strong>{submissions.find((s) => s.submissionNumber === currentAssignment.submissionNumber)?.djName ?? currentAssignment.submissionNumber}</strong></span>
             <button
               type="button"
               className="btn-danger btn-small"
@@ -74,11 +74,11 @@ export function SlotPicker({
           ) : (
             available.map((s) => (
               <button
-                key={s.djName}
+                key={s.submissionNumber}
                 type="button"
                 className="slot-picker-dj"
                 onClick={() => {
-                  onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex, s.djName)
+                  onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex, s.submissionNumber)
                   onClose()
                 }}
               >

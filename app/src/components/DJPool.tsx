@@ -6,19 +6,19 @@ interface Props {
   evening: string
   /** If set, clicking a DJ assigns them to this pending slot. */
   pendingSlot: { stageId: string; evening: string; slotIndex: number } | null
-  onAssign: (stageId: string, evening: string, slotIndex: number, djName: string) => void
+  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
 }
 
 export function DJPool({ submissions, assignments, evening, pendingSlot, onAssign }: Props) {
-  // All DJ names assigned anywhere in the lineup (sequential slotIndex or simultaneous positionIndex).
+  // All submission numbers assigned anywhere in the lineup (sequential slotIndex or simultaneous positionIndex).
   // This assignment-type-agnostic check correctly excludes DJs on silent disco stages too.
-  const assignedGlobally = new Set(assignments.map((a) => a.djName))
+  const assignedGlobally = new Set(assignments.map((a) => a.submissionNumber))
 
   // DJs available on this evening and not yet assigned anywhere
   const pool = submissions.filter(
     (s) =>
       s.daysAvailable.toLowerCase().includes(evening.toLowerCase()) &&
-      !assignedGlobally.has(s.djName)
+      !assignedGlobally.has(s.submissionNumber)
   )
 
   // All submissions available on this evening (for count display)
@@ -45,13 +45,13 @@ export function DJPool({ submissions, assignments, evening, pendingSlot, onAssig
       ) : (
         <ul className="pool-list">
           {pool.map((s) => (
-            <li key={s.djName} className="pool-item">
+            <li key={s.submissionNumber} className="pool-item">
               <button
                 type="button"
                 className={`pool-dj-btn${pendingSlot ? ' pool-dj-btn--selectable' : ''}`}
                 onClick={() => {
                   if (pendingSlot) {
-                    onAssign(pendingSlot.stageId, pendingSlot.evening, pendingSlot.slotIndex, s.djName)
+                    onAssign(pendingSlot.stageId, pendingSlot.evening, pendingSlot.slotIndex, s.submissionNumber)
                   }
                 }}
                 disabled={!pendingSlot}

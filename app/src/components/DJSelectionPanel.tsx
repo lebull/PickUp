@@ -225,7 +225,7 @@ export function DJSelectionPanel({
             type="button"
             className="btn-danger btn-small"
             onClick={() => {
-              onRemove(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex)
+              onRemove(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!)
               // Panel stays open — slot remains selected for immediate re-assignment
             }}
           >
