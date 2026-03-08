@@ -1,5 +1,4 @@
-```markdown
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: App-wide hidden names toggle
 The application SHALL provide a toggle control accessible from the global navigation or app header that switches the app into "Hidden Names" mode. When active, all DJ names and fur names throughout the application — including the lineup grid scheduler — SHALL be replaced with anonymous identifiers. This preference SHALL be stored in `AppPreferencesContext` and SHALL be persisted to `localStorage` across page reloads.
@@ -39,4 +38,3 @@ The application SHALL provide a toggle control accessible from the global naviga
 #### Scenario: Hidden Names affects DJ selection panel
 - **WHEN** `hiddenNames` is true and the DJ selection panel is open
 - **THEN** each DJ row SHALL show `DJ #N` (1-based load-order index) instead of the real name
-```

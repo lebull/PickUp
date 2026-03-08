@@ -3,7 +3,7 @@ import type { RefObject } from 'react'
 import type { Submission } from '../types.ts'
 import type { AppContextMode } from '../AppPreferencesContext.ts'
 
-export type SortField = 'main' | 'ml' | null
+export type SortField = 'main' | 'ml' | 'number' | null
 export type SortDir = 'asc' | 'desc'
 export type ScoreMetric = 'avg' | 'sum'
 export type RowState = 'discarded' | 'in-lineup' | 'duplicate-name' | 'none'
@@ -73,6 +73,17 @@ export function SubmissionList({
   const sorted = useMemo(() => {
     if (sortField === null) return filtered
     return [...filtered].sort((a, b) => {
+      if (sortField === 'number') {
+        const na = parseInt(a.submissionNumber, 10)
+        const nb = parseInt(b.submissionNumber, 10)
+        if (!isNaN(na) && !isNaN(nb)) {
+          return sortDir === 'desc' ? nb - na : na - nb
+        }
+        // fallback: lexicographic
+        return sortDir === 'desc'
+          ? b.submissionNumber.localeCompare(a.submissionNumber)
+          : a.submissionNumber.localeCompare(b.submissionNumber)
+      }
       const sa = getScore(a, sortField, scoreMetric)
       const sb = getScore(b, sortField, scoreMetric)
       if (sa === null && sb === null) return 0
@@ -121,7 +132,7 @@ export function SubmissionList({
     return () => el.removeEventListener('keydown', onKeyDown)
   }, [listRef, sorted, cursorIndex, submissions, onCursorChange, onSelect])
 
-  function arrow(field: 'main' | 'ml') {
+  function arrow(field: SortField) {
     if (sortField !== field) return <span className="sort-arrow" aria-hidden> </span>
     return <span className="sort-arrow active">{sortDir === 'desc' ? '▼' : '▲'}</span>
   }
@@ -158,7 +169,12 @@ export function SubmissionList({
         <table className="submission-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th
+                className={`th-sortable${sortField === 'number' ? ' th-active' : ''}`}
+                onClick={() => onHeaderClick('number')}
+              >
+                # {arrow('number')}
+              </th>
               <th>DJ Name</th>
               <th
                 className={`th-sortable${sortField === 'main' ? ' th-active' : ''}`}

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import { getSlotLabels, getEveningTimeAxis } from '../lineupUtils.ts'
+import { useAppPreferences } from '../AppPreferencesContext.ts'
 
 interface Props {
   submissions: Submission[]
@@ -31,6 +32,14 @@ export function LineupGrid({
   onSimultaneousClick,
   activeSlotKey,
 }: Props) {
+  const { hiddenNames } = useAppPreferences()
+
+  function getDisplayName(submissionNumber: string): string {
+    const idx = submissions.findIndex((s) => s.submissionNumber === submissionNumber)
+    if (hiddenNames) return idx >= 0 ? `DJ #${idx + 1}` : submissionNumber
+    return submissions[idx]?.djName ?? submissionNumber
+  }
+
   const activeEvenings = useMemo(() => {
     const daySet = new Set<string>()
     for (const stage of stages) {
@@ -80,7 +89,7 @@ export function LineupGrid({
   function resolveSimultaneousDJs(stageId: string): { positionIndex: 1 | 2 | 3; djName: string }[] {
     return getSimultaneousAssignments(stageId).map((a) => ({
       positionIndex: a.positionIndex as 1 | 2 | 3,
-      djName: submissions.find((s) => s.submissionNumber === a.submissionNumber)?.djName ?? a.submissionNumber,
+      djName: getDisplayName(a.submissionNumber),
     }))
   }
 
@@ -254,7 +263,7 @@ export function LineupGrid({
                   const slotKey = `${stage.id}|${evening}|${slotIndex}`
                   const isActive = activeSlotKey === slotKey
                   const assignedDjName = assignment
-                    ? (submissions.find((s) => s.submissionNumber === assignment.submissionNumber)?.djName ?? assignment.submissionNumber)
+                    ? getDisplayName(assignment.submissionNumber)
                     : null
                   return assignment ? (
                     <button

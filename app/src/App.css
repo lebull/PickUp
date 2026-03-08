@@ -1766,6 +1766,16 @@ input[type="time"] {
   font-size: 0.78rem;
 }
 
+.dj-col-format {
+  flex: 1.5;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #888;
+  font-size: 0.78rem;
+}
+
 .dj-col-vibefit {
   flex: 0 0 55px;
   text-align: center;

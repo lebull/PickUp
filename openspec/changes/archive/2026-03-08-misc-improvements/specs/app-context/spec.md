@@ -1,5 +1,4 @@
-```markdown
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: App-wide Standard/Moonlight context toggle
 The application SHALL provide a persistent toggle control accessible from the global navigation or app header that switches the app between "Standard" and "Moonlight" contexts. This preference SHALL be stored in a React context (`AppPreferencesContext`) available to all components. The selected context SHALL be persisted in `localStorage` so it survives page reloads. Preferences SHALL NOT be stored in the project file, as multiple users share the same project.
@@ -54,4 +53,3 @@ The `hiddenNames` preference SHALL be stored in `localStorage` so it is restored
 #### Scenario: Changing hidden-names persists to localStorage
 - **WHEN** the user toggles the hidden names control
 - **THEN** the new value SHALL be written to localStorage immediately
-```

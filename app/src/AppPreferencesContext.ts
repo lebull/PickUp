@@ -17,8 +17,50 @@ export function useAppPreferences(): AppPreferencesContextValue {
   return ctx
 }
 
+const PREFS_KEY = 'pickup_prefs_v1'
+
+interface StoredPrefs {
+  appContext: AppContextMode
+  hiddenNames: boolean
+}
+
+function loadPrefs(): StoredPrefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<StoredPrefs>
+      return {
+        appContext: parsed.appContext === 'moonlight' ? 'moonlight' : 'standard',
+        hiddenNames: typeof parsed.hiddenNames === 'boolean' ? parsed.hiddenNames : false,
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return { appContext: 'standard', hiddenNames: false }
+}
+
+function savePrefs(prefs: StoredPrefs): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  } catch {
+    // ignore storage errors (e.g. private browsing quota)
+  }
+}
+
 export function useAppPreferencesState(): AppPreferencesContextValue {
-  const [appContext, setAppContext] = useState<AppContextMode>('standard')
-  const [hiddenNames, setHiddenNames] = useState(false)
+  const [appContext, setAppContextState] = useState<AppContextMode>(() => loadPrefs().appContext)
+  const [hiddenNames, setHiddenNamesState] = useState<boolean>(() => loadPrefs().hiddenNames)
+
+  function setAppContext(ctx: AppContextMode) {
+    setAppContextState(ctx)
+    savePrefs({ appContext: ctx, hiddenNames })
+  }
+
+  function setHiddenNames(v: boolean) {
+    setHiddenNamesState(v)
+    savePrefs({ appContext, hiddenNames: v })
+  }
+
   return { appContext, setAppContext, hiddenNames, setHiddenNames }
 }

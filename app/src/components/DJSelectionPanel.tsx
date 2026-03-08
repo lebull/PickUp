@@ -174,6 +174,7 @@ export function DJSelectionPanel({
         <span className="dj-col-name">{djLabel(s)}</span>
         <span className="dj-col-score">{scoreLabel(s)}</span>
         <span className="dj-col-genre">{s.genre || '—'}</span>
+        <span className="dj-col-format" title={s.formatGear || ''}>{s.formatGear || '—'}</span>
         {appContext === 'moonlight' && (
           <span className="dj-col-vibefit">{s.mlVibefit || '—'}</span>
         )}
@@ -253,6 +254,7 @@ export function DJSelectionPanel({
         <span className="dj-col-name">DJ</span>
         <span className="dj-col-score">{appContext === 'moonlight' ? 'ML Score' : 'Main Score'}</span>
         <span className="dj-col-genre">Genre</span>
+        <span className="dj-col-format">Format / Gear</span>
         {appContext === 'moonlight' && <span className="dj-col-vibefit">Vibefit</span>}
         <span className="dj-col-stages">Stage Prefs</span>
       </div>

@@ -33,18 +33,16 @@ export function SubmissionsView() {
   const listRef = useRef<HTMLDivElement>(null)
   const { appContext, hiddenNames } = useAppPreferences()
 
-  const [sortField, setSortField] = useState<SortField>(() =>
-    appContext === 'moonlight' ? 'ml' : 'main'
-  )
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [sortField, setSortField] = useState<SortField>('number')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [scoreMetric, setScoreMetric] = useState<ScoreMetric>('avg')
   const [activeDays, setActiveDays] = useState<Set<string>>(new Set())
   const [cursorIndex, setCursorIndex] = useState<number | null>(null)
 
-  // Reset sort to active context score when appContext changes
+  // Reset sort to submission number when appContext changes
   useEffect(() => {
-    setSortField(appContext === 'moonlight' ? 'ml' : 'main')
-    setSortDir('desc')
+    setSortField('number')
+    setSortDir('asc')
   }, [appContext])
 
   if (submissions === null) return null

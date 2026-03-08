@@ -1,7 +1,7 @@
 ﻿## Requirements
 
 ### Requirement: Load and display submission list
-The application SHALL parse a user-supplied CSV file — imported via the CSV import button — and display all submissions in a tabular list view with the following visible columns: DJ Name (or anonymous ID when Hidden Names is active), Final Main Score, Final Moonlight Score, Genre, Preferred Stages, Days Available. When the active app context is Moonlight, a Vibefit column SHALL also be displayed. The list SHALL default to sorting by the score column matching the active app context (Main Score for Standard, ML Score for Moonlight), descending. The controls row SHALL display the total submission count and, when a day filter is active, the count of currently visible (filtered) submissions.
+The application SHALL parse a user-supplied CSV file — imported via the CSV import button — and display all submissions in a tabular list view with the following visible columns: DJ Name (or anonymous ID when Hidden Names is active), Final Main Score, Final Moonlight Score, Genre, Preferred Stages, Days Available. When the active app context is Moonlight, a Vibefit column SHALL also be displayed. The list SHALL default to sorting by submission number ascending. The controls row SHALL display the total submission count and, when a day filter is active, the count of currently visible (filtered) submissions.
 
 #### Scenario: CSV loads successfully after import
 - **WHEN** the user imports a valid scoresheet CSV via the import button
@@ -19,9 +19,13 @@ The application SHALL parse a user-supplied CSV file — imported via the CSV im
 - **WHEN** a submission has one or more days listed in the availability field
 - **THEN** they SHALL be displayed as a single string in the Days Available column
 
-#### Scenario: Default sort on load is active-context score descending
+#### Scenario: Default sort on load is submission number ascending
 - **WHEN** the submission list is first displayed after CSV import
-- **THEN** rows SHALL be sorted by the score column matching the active app context (Final Main Score for Standard, Final ML Score for Moonlight), in descending order
+- **THEN** rows SHALL be sorted by submission number in ascending order
+
+#### Scenario: Default sort resets to submission number when app context changes
+- **WHEN** the active app context changes between Standard and Moonlight
+- **THEN** the sort SHALL reset to submission number ascending
 
 #### Scenario: Hidden Names mode masks DJ Name column
 - **WHEN** `hiddenNames` is true and the submission list is displayed
@@ -68,6 +72,19 @@ The application SHALL allow the user to sort the submission list by score by cli
 #### Scenario: Non-score columns are not sortable
 - **WHEN** user clicks the DJ Name, Genre, Preferred Stages, or Days Available column header
 - **THEN** no sort change occurs and no arrow is displayed on that header
+
+### Requirement: Sort list by submission number
+The application SHALL allow the user to sort the submission list by submission number. Submission numbers SHALL be compared as integers (not lexicographically) when sorting.
+
+#### Scenario: Default sort is submission number ascending
+- **WHEN** the submission list is first loaded or the app context changes
+- **THEN** the active sort SHALL be submission number ascending
+- **THEN** the submission number column header SHALL display an upward arrow (▲)
+
+#### Scenario: Clicking submission number header toggles direction
+- **WHEN** the user clicks the submission number column header while it is the active sort
+- **THEN** the sort direction SHALL toggle between ascending and descending
+- **THEN** the header arrow SHALL update accordingly
 
 ### Requirement: Filter list by days available
 The application SHALL allow the user to filter the submission list by one or more days using toggle buttons.
