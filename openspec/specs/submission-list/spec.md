@@ -1,7 +1,7 @@
-## MODIFIED Requirements
+﻿## Requirements
 
 ### Requirement: Load and display submission list
-The application SHALL parse a user-supplied CSV file — imported via the CSV import button — and display all submissions in a tabular list view with the following visible columns: DJ Name (or anonymous ID when Hidden Names is active), Final Main Score, Final Moonlight Score, Genre, Preferred Stages, Days Available. When the active app context is Moonlight, a Vibefit column SHALL also be displayed. The list SHALL default to sorting by the score column matching the active app context (Main Score for Standard, ML Score for Moonlight), descending.
+The application SHALL parse a user-supplied CSV file — imported via the CSV import button — and display all submissions in a tabular list view with the following visible columns: DJ Name (or anonymous ID when Hidden Names is active), Final Main Score, Final Moonlight Score, Genre, Preferred Stages, Days Available. When the active app context is Moonlight, a Vibefit column SHALL also be displayed. The list SHALL default to sorting by the score column matching the active app context (Main Score for Standard, ML Score for Moonlight), descending. The controls row SHALL display the total submission count and, when a day filter is active, the count of currently visible (filtered) submissions.
 
 #### Scenario: CSV loads successfully after import
 - **WHEN** the user imports a valid scoresheet CSV via the import button
@@ -9,7 +9,7 @@ The application SHALL parse a user-supplied CSV file — imported via the CSV im
 
 #### Scenario: Missing Moonlight score
 - **WHEN** a submission has no Moonlight judge scores (ML columns are empty)
-- **THEN** the Final Moonlight Score cell displays "—" (em dash) rather than a number
+- **THEN** the Final Moonlight Score cell displays "â€”" (em dash) rather than a number
 
 #### Scenario: Preferred Stages displayed as single field
 - **WHEN** a submission has one or more stage preferences ranked
@@ -27,8 +27,16 @@ The application SHALL parse a user-supplied CSV file — imported via the CSV im
 - **WHEN** `hiddenNames` is true and the submission list is displayed
 - **THEN** the DJ Name column SHALL show `DJ #N` (1-based load-order index) instead of the real name
 
+#### Scenario: Total count shown in controls row
+- **WHEN** the submission list is displayed
+- **THEN** the controls row SHALL show the total number of submissions (e.g. "120 submissions")
+
+#### Scenario: Filtered count shown when day filter is active
+- **WHEN** one or more day toggles are active
+- **THEN** the controls row SHALL show both the filtered count and the total (e.g. "34 / 120 submissions")
+
 ### Requirement: Empty state before import
-The application SHALL display a prompt state — rather than an empty table — when no CSV has been imported yet.
+The application SHALL display a prompt state â€” rather than an empty table â€” when no CSV has been imported yet.
 
 #### Scenario: Initial load shows prompt
 - **WHEN** the application first loads and no file has been imported
@@ -41,12 +49,12 @@ The application SHALL allow the user to sort the submission list by score by cli
 #### Scenario: Click score column header to sort descending
 - **WHEN** user clicks the "Main Score" or "ML Score" column header for the first time (or when that column is not the active sort)
 - **THEN** rows are sorted in descending order by that column's score value using the current score metric (avg or sum)
-- **THEN** the clicked header SHALL display a downward arrow (▼) indicating descending sort
+- **THEN** the clicked header SHALL display a downward arrow (â–¼) indicating descending sort
 
 #### Scenario: Click active sort column header to reverse direction
 - **WHEN** user clicks the column header that is already the active sort column
 - **THEN** the sort direction SHALL toggle between descending and ascending
-- **THEN** the header arrow SHALL update to reflect the new direction (▼ for desc, ▲ for asc)
+- **THEN** the header arrow SHALL update to reflect the new direction (â–¼ for desc, â–² for asc)
 
 #### Scenario: Score metric dropdown changes sort value
 - **WHEN** user changes the score metric dropdown between "Average" and "Sum"
@@ -108,7 +116,7 @@ Clicking a submission row SHALL navigate to a URL-addressable detail view using 
 - **THEN** the app SHALL navigate back to `/project/:id/submissions`
 
 ### Requirement: Fluid column layout prevents hidden content
-The submission table SHALL use a fluid column layout so that all columns — including the last column (Preferred Stages) — are always visible and never silently clipped.
+The submission table SHALL use a fluid column layout so that all columns â€” including the last column (Preferred Stages) â€” are always visible and never silently clipped.
 
 #### Scenario: All columns visible without horizontal clip
 - **WHEN** the submission table is rendered at any viewport width wide enough to contain the table container
@@ -129,3 +137,4 @@ When the Lineup Builder mode is active, the submission list SHALL be accessible 
 #### Scenario: Clicking a pool entry assigns to selected slot
 - **WHEN** a grid slot is selected (awaiting assignment) and the organizer clicks a DJ in the pool
 - **THEN** that DJ is assigned to the selected slot
+

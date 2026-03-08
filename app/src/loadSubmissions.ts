@@ -64,11 +64,5 @@ export function parseSubmissions(csvText: string): Submission[] {
     mlScore: computeMLScore(row, COL),
   }))
 
-  // Deduplicate by djName — if a DJ submitted more than once, keep the last
-  // (most recent) entry, which contains their updated information.
-  const deduped = new Map<string, Submission>()
-  for (const s of parsed) {
-    deduped.set(s.djName, s)
-  }
-  return [...deduped.values()]
+  return parsed
 }

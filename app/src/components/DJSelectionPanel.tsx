@@ -17,9 +17,9 @@ interface Props {
   stages: Stage[]
   assignments: SlotAssignment[]
   activeSlot: ActiveSlot
-  onAssign: (stageId: string, evening: string, slotIndex: number, djName: string) => void
+  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
   onRemove: (stageId: string, evening: string, slotIndex: number) => void
-  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, djName: string) => void
+  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
   onClose: () => void
 }
 
@@ -82,20 +82,20 @@ export function DJSelectionPanel({
           a.slotIndex === activeSlot.slotIndex
       )
 
-  // DJs already assigned anywhere
-  const assignedDjNames = useMemo(() => new Set(assignments.map((a) => a.djName)), [assignments])
+  // Submissions already assigned anywhere (by submissionNumber)
+  const assignedNumbers = useMemo(() => new Set(assignments.map((a) => a.submissionNumber)), [assignments])
 
   const available = useMemo(() => {
     return submissions.filter((s) => {
-      // Exclude currently assigned DJ (shown in header instead)
-      if (currentAssignment && s.djName === currentAssignment.djName) return false
-      // Exclude DJs assigned elsewhere
-      if (assignedDjNames.has(s.djName)) return false
+      // Exclude currently assigned submission (shown in header instead)
+      if (currentAssignment && s.submissionNumber === currentAssignment.submissionNumber) return false
+      // Exclude submissions assigned elsewhere
+      if (assignedNumbers.has(s.submissionNumber)) return false
       // Must be available this evening
       if (!s.daysAvailable.toLowerCase().includes(activeSlot.evening.toLowerCase())) return false
       return true
     })
-  }, [submissions, currentAssignment, assignedDjNames, activeSlot.evening])
+  }, [submissions, currentAssignment, assignedNumbers, activeSlot.evening])
 
   // Sort by active-context score descending
   const sorted = useMemo(() => {
@@ -129,11 +129,11 @@ export function DJSelectionPanel({
     setFocusStage((prev) => (prev === name ? null : name))
   }
 
-  function handleAssign(djName: string) {
+  function handleAssign(submissionNumber: string) {
     if (isSimultaneous) {
-      onAddSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, djName)
+      onAddSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, submissionNumber)
     } else {
-      onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, djName)
+      onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, submissionNumber)
     }
     onClose()
   }
@@ -154,17 +154,17 @@ export function DJSelectionPanel({
   function renderCard(s: Submission) {
     return (
       <div
-        key={s.djName}
+        key={s.submissionNumber}
         className="dj-panel-card"
         draggable
         onDragStart={(e) => {
-          e.dataTransfer.setData('application/dj-name', s.djName)
+          e.dataTransfer.setData('application/dj-submission-number', s.submissionNumber)
           e.dataTransfer.effectAllowed = 'move'
         }}
-        onClick={() => handleAssign(s.djName)}
+        onClick={() => handleAssign(s.submissionNumber)}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.djName) }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.submissionNumber) }}
         aria-label={`Assign ${djLabel(s)}`}
       >
         <span className="dj-col-name">{djLabel(s)}</span>
@@ -204,9 +204,14 @@ export function DJSelectionPanel({
           <span>
             Current:{' '}
             <strong>
-              {hiddenNames
-                ? `DJ #${submissions.findIndex((s) => s.djName === currentAssignment.djName) + 1}`
-                : currentAssignment.djName}
+              {(() => {
+                const sub = submissions.find((s) => s.submissionNumber === currentAssignment.submissionNumber)
+                if (hiddenNames) {
+                  const origIndex = submissions.indexOf(sub!)
+                  return origIndex >= 0 ? `DJ #${origIndex + 1}` : currentAssignment.submissionNumber
+                }
+                return sub?.djName ?? currentAssignment.submissionNumber
+              })()}
             </strong>
           </span>
           <button

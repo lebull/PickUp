@@ -23,7 +23,7 @@ export interface SlotAssignment {
   slotIndex?: number
   /** Position index (1–3) for simultaneous stage assignments. Omitted for sequential assignments. */
   positionIndex?: 1 | 2 | 3
-  djName: string
+  submissionNumber: string
 }
 
 export interface LineupState {

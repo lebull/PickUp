@@ -1,8 +1,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: DJ selection panel provides a stage preference filter
-**Reason**: Replaced by the stage focus grouping approach in `dj-panel-stage-focus`.
-**Migration**: See `dj-panel-stage-focus/spec.md` for the replacement behaviour.
+The stage preference multi-select filter SHALL be replaced by the focus-stage grouping control described in `dj-panel-stage-focus/spec.md`. The `selectedStages: Set<string>` state and multi-toggle filter UI SHALL be removed.
+
+#### Scenario: Stage filter replaced by focus-stage grouping
+- **WHEN** the user wants to see DJs by stage preference
+- **THEN** the focus-stage selector SHALL be used instead of a multi-select filter
 
 ### Requirement: Active context determines default primary sort score column
 The submission list and DJ selection panel SHALL default to sorting by the score column that corresponds to the active app context, descending. Within stage-focus groups, the same score ordering SHALL apply within each group.

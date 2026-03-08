@@ -21,14 +21,14 @@ export function LineupView() {
 
   if (submissions === null) return null
 
-  function handleAssign(stageId: string, evening: string, slotIndex: number, djName: string) {
+  function handleAssign(stageId: string, evening: string, slotIndex: number, submissionNumber: string) {
     setProject((prev) => {
       if (!prev) return prev
       const assignments = [
         ...prev.assignments.filter(
           (a) => !(a.stageId === stageId && a.evening === evening && a.slotIndex === slotIndex)
         ),
-        { stageId, evening, slotIndex, djName },
+        { stageId, evening, slotIndex, submissionNumber },
       ]
       return { ...prev, assignments }
     })
@@ -49,7 +49,7 @@ export function LineupView() {
     stageId: string,
     evening: string,
     positionIndex: 1 | 2 | 3,
-    djName: string
+    submissionNumber: string
   ) {
     setProject((prev) => {
       if (!prev) return prev
@@ -62,7 +62,7 @@ export function LineupView() {
         ...prev.assignments.filter(
           (a) => !(a.stageId === stageId && a.evening === evening && a.positionIndex === positionIndex)
         ),
-        { stageId, evening, positionIndex, djName },
+        { stageId, evening, positionIndex, submissionNumber },
       ]
       return { ...prev, assignments }
     })

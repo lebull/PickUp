@@ -37,17 +37,36 @@ function ProjectWorkspace() {
     if (!id) return
     getProject(id).then((p) => {
       if (!p) { setNotFound(true); return }
-      setProject(p)
       // Restore submissions from stored CSV
+      let subs: Submission[] | null = null
       if (p.csvText) {
         try {
-          const subs = parseSubmissions(p.csvText)
+          subs = parseSubmissions(p.csvText)
           setSubmissions(subs)
           if (p.rowCount > 0 && p.rowCount !== subs.length) setRowCountMismatch(true)
         } catch {
           // CSV stored but can't parse — start empty
         }
       }
+      // Migrate legacy djName-keyed assignments to submissionNumber
+      if (subs && p.assignments.some((a) => !('submissionNumber' in a))) {
+        const migrated = p.assignments
+          .map((a) => {
+            if ('submissionNumber' in a) return a as typeof a & { submissionNumber: string }
+            const legacy = a as unknown as { djName: string } & typeof a
+            const match = subs!.find((s) => s.djName === legacy.djName)
+            if (!match) {
+              console.warn(`[migration] Could not resolve legacy assignment for djName="${legacy.djName}" — dropping`)
+              return null
+            }
+            const { djName: _dropped, ...rest } = legacy as Record<string, unknown>
+            void _dropped
+            return { ...rest, submissionNumber: match.submissionNumber } as typeof a & { submissionNumber: string }
+          })
+          .filter((a): a is NonNullable<typeof a> => a !== null)
+        p = { ...p, assignments: migrated }
+      }
+      setProject(p)
     })
   }, [id])
 

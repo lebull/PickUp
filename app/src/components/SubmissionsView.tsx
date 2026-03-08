@@ -53,11 +53,7 @@ export function SubmissionsView() {
   const hasSelection = djIndex !== undefined
 
   // Derive lineup submission numbers from project assignments
-  const lineupSubmissionNumbers = new Set(
-    project.assignments
-      .map((a) => submissions.find((s) => s.djName === a.djName)?.submissionNumber)
-      .filter((n): n is string => n !== undefined)
-  )
+  const lineupSubmissionNumbers = new Set(project.assignments.map((a) => a.submissionNumber))
 
   function handleHeaderClick(field: SortField) {
     if (field === sortField) {

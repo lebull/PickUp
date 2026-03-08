@@ -6,9 +6,9 @@ interface Props {
   submissions: Submission[]
   stages: Stage[]
   assignments: SlotAssignment[]
-  onAssign: (stageId: string, evening: string, slotIndex: number, djName: string) => void
+  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
   onRemove: (stageId: string, evening: string, slotIndex: number) => void
-  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, djName: string) => void
+  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
   onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3) => void
   onConfigureStages: () => void
   /** Called when a sequential slot cell is clicked; parent owns the active slot state. */
@@ -70,11 +70,18 @@ export function LineupGrid({
   }
 
   function getSimultaneousAssignments(stageId: string): SlotAssignment[] {
-    // Pool exclusion is assignment-type-agnostic: assignments.map(a => a.djName) covers
+    // Pool exclusion is assignment-type-agnostic: assignments.map(a => a.submissionNumber) covers
     // both sequential (slotIndex) and simultaneous (positionIndex) assignments.
     return assignments
       .filter((a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null)
       .sort((a, b) => (a.positionIndex ?? 0) - (b.positionIndex ?? 0))
+  }
+
+  function resolveSimultaneousDJs(stageId: string): { positionIndex: 1 | 2 | 3; djName: string }[] {
+    return getSimultaneousAssignments(stageId).map((a) => ({
+      positionIndex: a.positionIndex as 1 | 2 | 3,
+      djName: submissions.find((s) => s.submissionNumber === a.submissionNumber)?.djName ?? a.submissionNumber,
+    }))
   }
 
   function nextSimultaneousPosition(stageId: string): 1 | 2 | 3 | null {
@@ -164,7 +171,7 @@ export function LineupGrid({
                     key={stage.id}
                     stageId={stage.id}
                     evening={evening}
-                    assignedDJs={getSimultaneousAssignments(stage.id)}
+                    assignedDJs={resolveSimultaneousDJs(stage.id)}
                     nextPosition={nextSimultaneousPosition(stage.id)}
                     onAddClick={() => {
                       const pos = nextSimultaneousPosition(stage.id)
@@ -206,7 +213,7 @@ export function LineupGrid({
                           key={stage.id}
                           stageId={stage.id}
                           evening={evening}
-                          assignedDJs={getSimultaneousAssignments(stage.id)}
+                          assignedDJs={resolveSimultaneousDJs(stage.id)}
                           nextPosition={nextSimultaneousPosition(stage.id)}
                           onAddClick={() => {
                             const pos = nextSimultaneousPosition(stage.id)
@@ -246,6 +253,9 @@ export function LineupGrid({
                   const assignment = getAssignment(stage.id, slotIndex)
                   const slotKey = `${stage.id}|${evening}|${slotIndex}`
                   const isActive = activeSlotKey === slotKey
+                  const assignedDjName = assignment
+                    ? (submissions.find((s) => s.submissionNumber === assignment.submissionNumber)?.djName ?? assignment.submissionNumber)
+                    : null
                   return assignment ? (
                     <button
                       key={`${stage.id}-${timeLabel}`}
@@ -257,11 +267,11 @@ export function LineupGrid({
                       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
                       onDrop={(e) => {
                         e.preventDefault()
-                        const djName = e.dataTransfer.getData('application/dj-name')
-                        if (djName) onAssign(stage.id, evening, slotIndex, djName)
+                        const subNum = e.dataTransfer.getData('application/dj-submission-number')
+                        if (subNum) onAssign(stage.id, evening, slotIndex, subNum)
                       }}
                     >
-                      {assignment.djName}
+                      {assignedDjName}
                     </button>
                   ) : (
                     <button
@@ -274,8 +284,8 @@ export function LineupGrid({
                       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
                       onDrop={(e) => {
                         e.preventDefault()
-                        const djName = e.dataTransfer.getData('application/dj-name')
-                        if (djName) onAssign(stage.id, evening, slotIndex, djName)
+                        const subNum = e.dataTransfer.getData('application/dj-submission-number')
+                        if (subNum) onAssign(stage.id, evening, slotIndex, subNum)
                       }}
                     >
                       +
@@ -296,7 +306,7 @@ export function LineupGrid({
 interface SimultaneousCellProps {
   stageId: string
   evening: string
-  assignedDJs: SlotAssignment[]
+  assignedDJs: { positionIndex: 1 | 2 | 3; djName: string }[]
   nextPosition: 1 | 2 | 3 | null
   onAddClick: () => void
   onRemove: (positionIndex: 1 | 2 | 3) => void
