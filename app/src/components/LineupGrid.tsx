@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import { getSlotLabels, getEveningTimeAxis } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
@@ -7,6 +7,8 @@ interface Props {
   submissions: Submission[]
   stages: Stage[]
   assignments: SlotAssignment[]
+  selectedEvening: string
+  onSelectEvening: (evening: string) => void
   onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
   onRemove: (stageId: string, evening: string, slotIndex: number) => void
   onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
@@ -23,6 +25,8 @@ export function LineupGrid({
   submissions,
   stages,
   assignments,
+  selectedEvening,
+  onSelectEvening,
   onAssign,
   onRemove,
   onAddSimultaneous,
@@ -47,8 +51,6 @@ export function LineupGrid({
     }
     return ['Thursday', 'Friday', 'Saturday', 'Sunday'].filter((d) => daySet.has(d))
   }, [stages])
-
-  const [selectedEvening, setSelectedEvening] = useState<string>(() => activeEvenings[0] ?? '')
 
   const evening = activeEvenings.includes(selectedEvening)
     ? selectedEvening
@@ -129,7 +131,7 @@ export function LineupGrid({
             key={day}
             type="button"
             className={`evening-btn${day === evening ? ' active' : ''}`}
-            onClick={() => setSelectedEvening(day)}
+            onClick={() => onSelectEvening(day)}
           >
             {day}
           </button>

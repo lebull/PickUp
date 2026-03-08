@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useProjectContext } from '../ProjectContext.ts'
 import { LineupGrid } from './LineupGrid.tsx'
 import { StageConfigPanel } from './StageConfigPanel.tsx'
 import { DJSelectionPanel } from './DJSelectionPanel.tsx'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
-import type { Stage } from '../types.ts'
+import type { Stage, SlotAssignment } from '../types.ts'
 import { saveProject } from '../projectStore.ts'
 import { SplitPane } from './SplitPane.tsx'
+import { getSlotLabels } from '../lineupUtils.ts'
 
 export function LineupView() {
   const { project, setProject, submissions, rowCountMismatch, setRowCountMismatch } = useProjectContext()
@@ -14,6 +15,56 @@ export function LineupView() {
   const [showStageConfig, setShowStageConfig] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [activeSlot, setActiveSlot] = useState<ActiveSlot | null>(null)
+
+  // Derived list of active evenings in convention order
+  const activeEvenings = useMemo(() => {
+    const daySet = new Set<string>()
+    for (const stage of project.stages) {
+      for (const day of stage.activeDays) daySet.add(day)
+    }
+    return ['Thursday', 'Friday', 'Saturday', 'Sunday'].filter((d) => daySet.has(d))
+  }, [project.stages])
+
+  const [selectedEvening, setSelectedEvening] = useState<string>(() => activeEvenings[0] ?? 'Thursday')
+
+  /** Returns the next empty sequential ActiveSlot on the given evening, or null if none. */
+  function findNextEmptySlot(
+    stages: Stage[],
+    assignments: SlotAssignment[],
+    evening: string,
+    currentSlot: ActiveSlot
+  ): ActiveSlot | null {
+    const sequentialStages = stages.filter(
+      (s) => s.activeDays.includes(evening) && (s.stageType ?? 'sequential') === 'sequential'
+    )
+    // Build an ordered list of all sequential slots for this evening
+    const allSlots: ActiveSlot[] = []
+    for (const stage of sequentialStages) {
+      const labels = getSlotLabels(stage, evening)
+      labels.forEach((timeLabel, slotIndex) => {
+        allSlots.push({ stageId: stage.id, evening, slotIndex, timeLabel })
+      })
+    }
+    // Find occupied slot indices
+    const occupied = new Set(
+      assignments
+        .filter((a) => a.evening === evening && a.slotIndex != null)
+        .map((a) => `${a.stageId}|${a.slotIndex}`)
+    )
+    // Find index of current slot in the list
+    const currentIdx = allSlots.findIndex(
+      (s) => s.stageId === currentSlot.stageId && s.slotIndex === currentSlot.slotIndex
+    )
+    // Scan from next slot onward (wrapping), looking for first empty slot
+    const len = allSlots.length
+    for (let i = 1; i < len; i++) {
+      const candidate = allSlots[(currentIdx + i) % len]
+      if (!occupied.has(`${candidate.stageId}|${candidate.slotIndex}`)) {
+        return candidate
+      }
+    }
+    return null
+  }
 
   function handleSimultaneousClick(slot: { stageId: string; evening: string; positionIndex: 1 | 2 | 3; timeLabel: string }) {
     setActiveSlot(slot)
@@ -30,6 +81,15 @@ export function LineupView() {
         ),
         { stageId, evening, slotIndex, submissionNumber },
       ]
+      // Advance active slot to the next empty sequential slot on this evening
+      if (activeSlot) {
+        const newAssignments = assignments
+        const nextSlot = findNextEmptySlot(prev.stages, newAssignments, evening, activeSlot)
+        if (nextSlot) {
+          setActiveSlot(nextSlot)
+        }
+        // If no next slot, leave activeSlot unchanged (stay on the current slot)
+      }
       return { ...prev, assignments }
     })
   }
@@ -42,6 +102,7 @@ export function LineupView() {
       )
       return { ...prev, assignments }
     })
+    // Do NOT clear activeSlot — keep it selected so user can assign a replacement immediately
   }
 
   /** Adds a DJ to a simultaneous stage position (1–3). Enforces the max-3 cap. */
@@ -126,6 +187,8 @@ export function LineupView() {
                 submissions={submissions}
                 stages={project.stages}
                 assignments={project.assignments}
+                selectedEvening={selectedEvening}
+                onSelectEvening={setSelectedEvening}
                 onAssign={handleAssign}
                 onRemove={handleRemove}
                 onAddSimultaneous={handleAddSimultaneous}
@@ -165,6 +228,8 @@ export function LineupView() {
               submissions={submissions}
               stages={project.stages}
               assignments={project.assignments}
+              selectedEvening={selectedEvening}
+              onSelectEvening={setSelectedEvening}
               onAssign={handleAssign}
               onRemove={handleRemove}
               onAddSimultaneous={handleAddSimultaneous}

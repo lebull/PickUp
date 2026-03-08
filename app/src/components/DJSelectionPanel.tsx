@@ -69,10 +69,10 @@ export function DJSelectionPanel({
     return [...seen].sort()
   }, [submissions])
 
-  // Reset focus stage whenever the active slot changes
+  // Reset focus stage only when the evening changes, not on every slot advance
   useEffect(() => {
     setFocusStage(null)
-  }, [activeSlot])
+  }, [activeSlot.evening])
 
   // For sequential slots: the currently assigned DJ for this exact slot
   const currentAssignment = isSimultaneous
@@ -97,9 +97,11 @@ export function DJSelectionPanel({
       if (discardedSubmissionNumbers.has(s.submissionNumber)) return false
       // Must be available this evening
       if (!s.daysAvailable.toLowerCase().includes(activeSlot.evening.toLowerCase())) return false
+      // In moonlight context, only show moonlight-opted-in submissions
+      if (appContext === 'moonlight' && !s.moonlightInterest) return false
       return true
     })
-  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, activeSlot.evening])
+  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, activeSlot.evening, appContext])
 
   // Sort by active-context score descending
   const sorted = useMemo(() => {
@@ -139,7 +141,7 @@ export function DJSelectionPanel({
     } else {
       onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, submissionNumber)
     }
-    onClose()
+    // Panel stays open — parent (LineupView) advances the active slot
   }
 
   function djLabel(s: Submission): string {
@@ -224,7 +226,7 @@ export function DJSelectionPanel({
             className="btn-danger btn-small"
             onClick={() => {
               onRemove(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex)
-              onClose()
+              // Panel stays open — slot remains selected for immediate re-assignment
             }}
           >
             Remove
