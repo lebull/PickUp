@@ -1,5 +1,7 @@
+import { useRef, useState, useEffect } from 'react'
 import type { Submission } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
+import { useProjectContext } from '../ProjectContext.ts'
 
 function val(s: string | null | undefined): string {
   return s?.trim() || '—'
@@ -98,6 +100,26 @@ interface Props {
 
 export function SubmissionDetail({ submission: s, onBack }: Props) {
   const { appContext, hiddenNames } = useAppPreferences()
+  const { project, toggleDiscardSubmission } = useProjectContext()
+  const isDiscarded = (project.discardedSubmissions ?? []).includes(s.submissionNumber)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onPointerDown(e: PointerEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [menuOpen])
   const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th']
   const stagePrefsWithLabel = s.stagePreferences.map((p, i) => `${ORDINALS[i]}: ${p}`)
 
@@ -158,7 +180,31 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
 
   return (
     <div className="detail-view">
-      <button type="button" className="back-button" onClick={onBack}>← Back</button>
+      <div className="detail-header-row">
+        <button type="button" className="back-button" onClick={onBack}>← Back</button>
+        <div className="detail-actions-menu" ref={menuRef}>
+          <button
+            type="button"
+            className="btn-secondary btn-small"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="true"
+            aria-expanded={menuOpen}
+          >
+            ⋯ Actions
+          </button>
+          {menuOpen && (
+            <div className="nav-actions-dropdown detail-actions-dropdown">
+              <button
+                type="button"
+                className={`detail-action-item${isDiscarded ? ' detail-action-item--active' : ''}`}
+                onClick={() => { toggleDiscardSubmission(s.submissionNumber); setMenuOpen(false) }}
+              >
+                {isDiscarded ? '↩ Un-discard submission' : '🚫 Discard submission'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       <h1 className="detail-title">{displayName}</h1>
 

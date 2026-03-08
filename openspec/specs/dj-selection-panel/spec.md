@@ -25,11 +25,11 @@ When a user clicks an empty or filled lineup slot, the application SHALL display
 - **THEN** the panel SHALL close without making any assignment change
 
 ### Requirement: DJ selection panel lists available DJs with relevant columns
-The panel SHALL display only DJs who are available on the active slot's evening and are not already assigned elsewhere in the lineup. Each row SHALL show: DJ Name (or anonymous ID when hidden-names is active), active-context score, Genre (display only), Stage Preferences, and Vibefit (Moonlight context only). The list SHALL default to sorting by active-context score descending. When a focus stage is active, DJs SHALL be grouped by their preference rank for that stage rather than shown as a flat list. The panel SHALL fill the width of its container rather than using a fixed width.
+The panel SHALL display only DJs who are available on the active slot's evening, are not already assigned elsewhere in the lineup, and are **not discarded**. Each row SHALL show: DJ Name (or anonymous ID when hidden-names is active), active-context score, Genre (display only), Stage Preferences, and Vibefit (Moonlight context only). The list SHALL default to sorting by active-context score descending. When a focus stage is active, DJs SHALL be grouped by their preference rank for that stage rather than shown as a flat list. The panel SHALL fill the width of its container rather than using a fixed width.
 
-#### Scenario: Only available DJs shown
+#### Scenario: Only available, non-discarded DJs shown
 - **WHEN** the DJ selection panel is open for a slot on a given evening
-- **THEN** only submissions whose `daysAvailable` includes that evening AND who are not already assigned to another slot SHALL be listed
+- **THEN** only submissions whose `daysAvailable` includes that evening AND who are not already assigned to another slot AND whose `submissionNumber` is NOT in `project.discardedSubmissions` SHALL be listed
 
 #### Scenario: Currently assigned DJ excluded from available list
 - **WHEN** the active slot already has a DJ assigned

@@ -9,6 +9,7 @@ export interface ProjectContextValue {
   setSubmissions: Dispatch<SetStateAction<Submission[] | null>>
   rowCountMismatch: boolean
   setRowCountMismatch: Dispatch<SetStateAction<boolean>>
+  toggleDiscardSubmission: (submissionNumber: string) => void
 }
 
 export const ProjectContext = createContext<ProjectContextValue | null>(null)

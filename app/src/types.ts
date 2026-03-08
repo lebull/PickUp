@@ -38,6 +38,7 @@ export interface Project {
   csvText: string
   stages: Stage[]
   assignments: SlotAssignment[]
+  discardedSubmissions: string[]
   rowCount: number
   createdAt: string  // ISO timestamp
   updatedAt: string  // ISO timestamp

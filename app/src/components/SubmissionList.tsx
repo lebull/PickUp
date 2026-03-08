@@ -6,6 +6,7 @@ import type { AppContextMode } from '../AppPreferencesContext.ts'
 export type SortField = 'main' | 'ml' | null
 export type SortDir = 'asc' | 'desc'
 export type ScoreMetric = 'avg' | 'sum'
+export type RowState = 'discarded' | 'in-lineup' | 'duplicate-name' | 'none'
 
 const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -33,6 +34,7 @@ interface Props {
   activeDays: Set<string>
   cursorIndex: number | null
   lineupSubmissionNumbers: Set<string>
+  discardedSubmissionNumbers: Set<string>
   hiddenNames: boolean
   appContext: AppContextMode
   listRef: RefObject<HTMLDivElement | null>
@@ -51,6 +53,7 @@ export function SubmissionList({
   activeDays,
   cursorIndex,
   lineupSubmissionNumbers,
+  discardedSubmissionNumbers,
   hiddenNames,
   appContext,
   listRef,
@@ -78,6 +81,21 @@ export function SubmissionList({
       return sortDir === 'desc' ? sb - sa : sa - sb
     })
   }, [filtered, sortField, sortDir, scoreMetric])
+
+  // Task 3.2: compute set of djNames that appear in more than one non-discarded submission
+  const duplicateNames = useMemo(() => {
+    const nameCount = new Map<string, number>()
+    for (const s of submissions) {
+      if (!discardedSubmissionNumbers.has(s.submissionNumber)) {
+        nameCount.set(s.djName, (nameCount.get(s.djName) ?? 0) + 1)
+      }
+    }
+    const dupes = new Set<string>()
+    for (const [name, count] of nameCount) {
+      if (count > 1) dupes.add(name)
+    }
+    return dupes
+  }, [submissions, discardedSubmissionNumbers])
 
   // Keyboard navigation handler attached to the list container
   useEffect(() => {
@@ -163,11 +181,20 @@ export function SubmissionList({
           <tbody>
             {sorted.map((s, displayedIndex) => {
               const origIndex = submissions.indexOf(s)
+              const isDiscarded = discardedSubmissionNumbers.has(s.submissionNumber)
               const inLineup = lineupSubmissionNumbers.has(s.submissionNumber)
+              const isDuplicate = !isDiscarded && duplicateNames.has(s.djName)
               const isCursor = cursorIndex === displayedIndex
+
+              // Task 3.3: priority-ordered row state
+              const rowState: RowState = isDiscarded ? 'discarded'
+                : inLineup ? 'in-lineup'
+                : isDuplicate ? 'duplicate-name'
+                : 'none'
+
               const rowClass = [
                 'submission-row',
-                inLineup ? 'in-lineup' : '',
+                rowState !== 'none' ? rowState : '',
                 isCursor ? 'row-cursor' : '',
               ].filter(Boolean).join(' ')
               return (
@@ -179,7 +206,9 @@ export function SubmissionList({
                   <td>{origIndex + 1}</td>
                   <td>
                     {hiddenNames ? `DJ #${origIndex + 1}` : s.djName}
-                    {inLineup && <span className="lineup-badge">✓ In Lineup</span>}
+                    {rowState === 'in-lineup' && <span className="lineup-badge">✓ In Lineup</span>}
+                    {rowState === 'discarded' && <span className="discarded-badge">✕ Discarded</span>}
+                    {rowState === 'duplicate-name' && <span className="duplicate-badge">⚠ Duplicate Name</span>}
                   </td>
                   <td>
                     {displayScore(s, 'main', scoreMetric)}

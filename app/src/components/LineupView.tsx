@@ -144,6 +144,7 @@ export function LineupView() {
               submissions={submissions}
               stages={project.stages}
               assignments={project.assignments}
+              discardedSubmissionNumbers={new Set(project.discardedSubmissions ?? [])}
               activeSlot={activeSlot}
               onAssign={handleAssign}
               onRemove={handleRemove}

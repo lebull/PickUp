@@ -27,6 +27,7 @@ export async function createProject(name: string): Promise<Project> {
     csvText: '',
     stages: [],
     assignments: [],
+    discardedSubmissions: [],
     rowCount: 0,
     createdAt: now,
     updatedAt: now,
@@ -49,6 +50,9 @@ function normalizeProject(project: Project): Project {
       ...s,
       stageType: s.stageType ?? 'sequential',
     })),
+    // discardedSubmissions was added in the discard-submission change.
+    // Legacy projects without the field default to an empty array.
+    discardedSubmissions: project.discardedSubmissions ?? [],
   }
 }
 

@@ -92,6 +92,16 @@ function ProjectWorkspace() {
     await saveProject(updated)
   }
 
+  function handleToggleDiscard(submissionNumber: string) {
+    if (!project) return
+    const current = project.discardedSubmissions ?? []
+    const updated: Project = current.includes(submissionNumber)
+      ? { ...project, discardedSubmissions: current.filter((n) => n !== submissionNumber) }
+      : { ...project, discardedSubmissions: [...current, submissionNumber] }
+    setProject(updated)
+    saveProject(updated)
+  }
+
   if (notFound) {
     return (
       <div className="app">
@@ -116,7 +126,7 @@ function ProjectWorkspace() {
   }
 
   return (
-    <ProjectContext.Provider value={{ project, setProject, submissions, setSubmissions, rowCountMismatch, setRowCountMismatch }}>
+    <ProjectContext.Provider value={{ project, setProject, submissions, setSubmissions, rowCountMismatch, setRowCountMismatch, toggleDiscardSubmission: handleToggleDiscard }}>
       <div className="app">
         <header className="app-header">
           <Link to="/" className="back-link">← Projects</Link>

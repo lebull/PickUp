@@ -6,7 +6,6 @@ import type { SortField, SortDir, ScoreMetric } from './SubmissionList.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { SplitPane } from './SplitPane.tsx'
-
 function SubmissionDetailRoute() {
   const { djIndex } = useParams<{ djIndex: string }>()
   const { submissions } = useProjectContext()
@@ -54,6 +53,7 @@ export function SubmissionsView() {
 
   // Derive lineup submission numbers from project assignments
   const lineupSubmissionNumbers = new Set(project.assignments.map((a) => a.submissionNumber))
+  const discardedSubmissionNumbers = new Set(project.discardedSubmissions ?? [])
 
   function handleHeaderClick(field: SortField) {
     if (field === sortField) {
@@ -94,6 +94,7 @@ export function SubmissionsView() {
           activeDays={activeDays}
           cursorIndex={cursorIndex}
           lineupSubmissionNumbers={lineupSubmissionNumbers}
+          discardedSubmissionNumbers={discardedSubmissionNumbers}
           hiddenNames={hiddenNames}
           appContext={appContext}
           onHeaderClick={handleHeaderClick}

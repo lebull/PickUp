@@ -16,6 +16,7 @@ interface Props {
   submissions: Submission[]
   stages: Stage[]
   assignments: SlotAssignment[]
+  discardedSubmissionNumbers: Set<string>
   activeSlot: ActiveSlot
   onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
   onRemove: (stageId: string, evening: string, slotIndex: number) => void
@@ -43,6 +44,7 @@ export function DJSelectionPanel({
   submissions,
   stages,
   assignments,
+  discardedSubmissionNumbers,
   activeSlot,
   onAssign,
   onRemove,
@@ -91,11 +93,13 @@ export function DJSelectionPanel({
       if (currentAssignment && s.submissionNumber === currentAssignment.submissionNumber) return false
       // Exclude submissions assigned elsewhere
       if (assignedNumbers.has(s.submissionNumber)) return false
+      // Exclude discarded submissions
+      if (discardedSubmissionNumbers.has(s.submissionNumber)) return false
       // Must be available this evening
       if (!s.daysAvailable.toLowerCase().includes(activeSlot.evening.toLowerCase())) return false
       return true
     })
-  }, [submissions, currentAssignment, assignedNumbers, activeSlot.evening])
+  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, activeSlot.evening])
 
   // Sort by active-context score descending
   const sorted = useMemo(() => {
