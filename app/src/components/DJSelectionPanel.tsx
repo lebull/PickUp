@@ -321,6 +321,8 @@ export function DJSelectionPanel({
 
   return (
     <div className="dj-selection-panel">
+      <div className="dj-panel-scrollable">
+      <div className="dj-panel-sticky-header">
       {/* Header */}
       <div className="dj-panel-header">
         <div className="dj-panel-title">
@@ -394,6 +396,7 @@ export function DJSelectionPanel({
         {appContext === 'moonlight' && <span className="dj-col-vibefit">Vibefit</span>}
         <span className="dj-col-stages">Stage Prefs</span>
       </div>
+      </div>
 
       {/* DJ list */}
       <div className="dj-panel-list">
@@ -411,6 +414,7 @@ export function DJSelectionPanel({
         ) : (
           sorted.map(renderCard)
         )}
+      </div>
       </div>
     </div>
   )

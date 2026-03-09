@@ -64,7 +64,7 @@
 .split-pane-right {
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  overflow: hidden;
   border-left: 1px solid #2e2e2e;
 }
 
@@ -1702,13 +1702,27 @@ input[type="time"] {
 
 /* ── DJ Selection Panel ──────────────────────────────────── */
 .dj-selection-panel {
-  flex: 1;
+  height: 100%;
   min-width: 0;
   background: #1a1a1a;
   border-left: 1px solid #333;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+.dj-panel-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.dj-panel-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #1a1a1a;
 }
 
 .dj-panel-header {
@@ -1848,12 +1862,11 @@ input[type="time"] {
 }
 
 .dj-panel-list {
-  overflow-y: auto;
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.35rem;
+  padding-bottom: 1rem;
 }
 
 .dj-panel-card {

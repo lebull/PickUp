@@ -214,7 +214,9 @@ export function LineupView() {
                 onSimultaneousClick={handleSimultaneousClick}
                 activeSlotKey={
                   activeSlot
-                    ? `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.slotIndex}`
+                    ? activeSlot.positionIndex != null
+                      ? `${activeSlot.stageId}|${activeSlot.evening}|simultaneous`
+                      : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.slotIndex}`
                     : null
                 }
               />

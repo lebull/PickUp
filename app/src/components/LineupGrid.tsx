@@ -200,7 +200,12 @@ export function LineupGrid({
                       const pos = nextSimultaneousPosition(stage.id)
                       if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
                     }}
+                    onCellClick={() => {
+                      const pos = nextSimultaneousPosition(stage.id) ?? 1
+                      onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
+                    }}
                     onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
+                    isActive={activeSlotKey === `${stage.id}|${evening}|simultaneous`}
                     gridRowStart={2}
                     gridRowEnd={3}
                     gridColumn={stageIndex + 2}
@@ -250,7 +255,12 @@ export function LineupGrid({
                             const pos = nextSimultaneousPosition(stage.id)
                             if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
                           }}
+                          onCellClick={() => {
+                            const pos = nextSimultaneousPosition(stage.id) ?? 1
+                            onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
+                          }}
                           onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
+                          isActive={activeSlotKey === `${stage.id}|${evening}|simultaneous`}
                           gridRowStart={gridRowStart}
                           gridRowEnd={gridRowEnd}
                           gridColumn={colIndex}
@@ -358,6 +368,8 @@ interface SimultaneousCellProps {
   nextPosition: 1 | 2 | 3 | null
   onAddClick: () => void
   onRemove: (positionIndex: 1 | 2 | 3) => void
+  onCellClick?: () => void
+  isActive?: boolean
   gridRowStart: number
   gridRowEnd: number
   /** 1-based CSS grid column (col 1 = time gutter, col 2 = first stage). */
@@ -370,6 +382,8 @@ function SimultaneousCell({
   nextPosition,
   onAddClick,
   onRemove,
+  onCellClick,
+  isActive,
   gridRowStart,
   gridRowEnd,
   gridColumn,
@@ -377,12 +391,13 @@ function SimultaneousCell({
 }: SimultaneousCellProps) {
   return (
     <div
-      className="grid-cell grid-slot grid-slot--simultaneous"
+      className={`grid-cell grid-slot grid-slot--simultaneous${isActive ? ' grid-slot--active' : ''}`}
       style={{
         gridRow: `${gridRowStart} / ${gridRowEnd}`,
         gridColumn,
         ...(color ? { borderColor: color, backgroundColor: hexToTint(color, 0.12) } : {}),
       }}
+      onClick={onCellClick}
     >
       <div className="simultaneous-djs">
         {assignedDJs.map((a) => (
@@ -392,7 +407,7 @@ function SimultaneousCell({
               type="button"
               className="simultaneous-dj-remove"
               title="Remove DJ"
-              onClick={() => onRemove(a.positionIndex as 1 | 2 | 3)}
+              onClick={(e) => { e.stopPropagation(); onRemove(a.positionIndex as 1 | 2 | 3) }}
             >
               ×
             </button>
@@ -400,7 +415,7 @@ function SimultaneousCell({
         ))}
         {/* Show Add DJ button only when cap not reached */}
         {nextPosition !== null && (
-          <button type="button" className="simultaneous-add-btn" onClick={onAddClick}>
+          <button type="button" className="simultaneous-add-btn" onClick={(e) => { e.stopPropagation(); onAddClick() }}>
             + Add DJ
           </button>
         )}
