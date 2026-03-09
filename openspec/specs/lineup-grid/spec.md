@@ -1,3 +1,5 @@
+> **Cell interaction contract**: Sequential slot cells conform to the [`lineup-event-cell`](../lineup-event-cell/spec.md) shared interaction contract. Requirements in that spec apply to sequential cells without needing to be repeated here. Requirements below that describe per-cell behavior are sequential-specific extensions or clarifications. In any conflict, `lineup-event-cell` governs.
+
 ## Requirements
 
 ### Requirement: Render the schedule grid

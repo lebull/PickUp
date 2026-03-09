@@ -30,7 +30,7 @@ export function LineupGrid({
   onSelectEvening,
   onAssign,
   onRemove: _onRemove,
-  onAddSimultaneous: _onAddSimultaneous,
+  onAddSimultaneous,
   onRemoveSimultaneous,
   onConfigureStages,
   onSlotClick,
@@ -204,6 +204,10 @@ export function LineupGrid({
                       const pos = nextSimultaneousPosition(stage.id) ?? 1
                       onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
                     }}
+                    onDrop={(subNum) => {
+                      const pos = nextSimultaneousPosition(stage.id)
+                      if (pos) onAddSimultaneous(stage.id, evening, pos, subNum)
+                    }}
                     onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
                     isActive={activeSlotKey === `${stage.id}|${evening}|simultaneous`}
                     gridRowStart={2}
@@ -258,6 +262,10 @@ export function LineupGrid({
                           onCellClick={() => {
                             const pos = nextSimultaneousPosition(stage.id) ?? 1
                             onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
+                          }}
+                          onDrop={(subNum) => {
+                            const pos = nextSimultaneousPosition(stage.id)
+                            if (pos) onAddSimultaneous(stage.id, evening, pos, subNum)
                           }}
                           onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
                           isActive={activeSlotKey === `${stage.id}|${evening}|simultaneous`}
@@ -368,6 +376,7 @@ interface SimultaneousCellProps {
   nextPosition: 1 | 2 | 3 | null
   onAddClick: () => void
   onRemove: (positionIndex: 1 | 2 | 3) => void
+  onDrop: (submissionNumber: string) => void
   onCellClick?: () => void
   isActive?: boolean
   gridRowStart: number
@@ -382,6 +391,7 @@ function SimultaneousCell({
   nextPosition,
   onAddClick,
   onRemove,
+  onDrop,
   onCellClick,
   isActive,
   gridRowStart,
@@ -398,6 +408,13 @@ function SimultaneousCell({
         ...(color ? { borderColor: color, backgroundColor: hexToTint(color, 0.12) } : {}),
       }}
       onClick={onCellClick}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = nextPosition === null ? 'none' : 'move' }}
+      onDrop={(e) => {
+        e.preventDefault()
+        if (nextPosition === null) return
+        const subNum = e.dataTransfer.getData('application/dj-submission-number')
+        if (subNum) onDrop(subNum)
+      }}
     >
       <div className="simultaneous-djs">
         {assignedDJs.map((a) => (

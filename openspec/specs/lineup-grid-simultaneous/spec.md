@@ -1,3 +1,15 @@
+> **Cell interaction contract**: Simultaneous stage cells conform to the [`lineup-event-cell`](../lineup-event-cell/spec.md) shared interaction contract. Requirements in that spec apply to simultaneous cells without needing to be repeated here. Requirements below are simultaneous-specific **exceptions** or **additions** to that shared contract.
+>
+> **Exceptions from `lineup-event-cell`**:
+> - `[sequential-only]` *One DJ per cell*: simultaneous cells hold up to 3 DJs concurrently (one per position index).
+> - `[sequential-only]` *Single cell action on occupied*: simultaneous cells do not replace an existing DJ on click/drop — they add to the next available position. Individual DJs are removed via per-badge remove controls, not a whole-cell action.
+>
+> **Additions** (simultaneous-only behaviors not in `lineup-event-cell`):
+> - DJ capacity cap (maximum 3 per evening, enforced in UI and data layer)
+> - Per-position DJ badges, each with an individual remove control
+> - "Add DJ" button visibility gated on cap (hidden when 3 DJs assigned)
+> - Cell placement spanning the stage's configured start/end time window on the time axis
+
 ## Requirements
 
 ### Requirement: Render simultaneous stage columns without slot rows
