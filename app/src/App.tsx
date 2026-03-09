@@ -7,6 +7,7 @@ import { ProjectList } from './components/ProjectList.tsx'
 import { ProjectCreate } from './components/ProjectCreate.tsx'
 import { SubmissionsView } from './components/SubmissionsView.tsx'
 import { LineupView } from './components/LineupView.tsx'
+import { ResultsList } from './components/ResultsList.tsx'
 import { getProject, saveProject } from './projectStore.ts'
 import { ProjectContext } from './ProjectContext.ts'
 import { AppPreferencesContext, useAppPreferencesState } from './AppPreferencesContext.ts'
@@ -146,6 +147,12 @@ function ProjectWorkspace() {
               >
                 Lineup Builder
               </NavLink>
+              <NavLink
+                to="results"
+                className={({ isActive }) => `mode-tab${isActive ? ' active' : ''}`}
+              >
+                Results
+              </NavLink>
             </nav>
           )}
           <div className="header-actions">
@@ -183,6 +190,7 @@ function App() {
           <Route path="submissions" element={<SubmissionsView />} />
           <Route path="submissions/:djIndex" element={<SubmissionsView />} />
           <Route path="lineup" element={<LineupView />} />
+          <Route path="results" element={<ResultsList />} />
         </Route>
       </Routes>
     </AppPreferencesContext.Provider>
