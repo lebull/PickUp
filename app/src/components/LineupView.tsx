@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useProjectContext } from '../ProjectContext.ts'
 import { LineupGrid } from './LineupGrid.tsx'
 import { StageConfigPanel } from './StageConfigPanel.tsx'
 import { DJSelectionPanel } from './DJSelectionPanel.tsx'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
 import type { Stage, SlotAssignment } from '../types.ts'
-import { saveProject } from '../projectStore.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { getSlotLabels } from '../lineupUtils.ts'
 
@@ -13,19 +13,28 @@ export function LineupView() {
   const { project, setProject, submissions, rowCountMismatch, setRowCountMismatch } = useProjectContext()
 
   const [showStageConfig, setShowStageConfig] = useState(false)
-  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [activeSlot, setActiveSlot] = useState<ActiveSlot | null>(null)
+  const { day } = useParams<{ day?: string }>()
+  const navigate = useNavigate()
 
   // Derived list of active evenings in convention order
   const activeEvenings = useMemo(() => {
     const daySet = new Set<string>()
     for (const stage of project.stages) {
-      for (const day of stage.activeDays) daySet.add(day)
+      for (const d of stage.activeDays) daySet.add(d)
     }
     return ['Thursday', 'Friday', 'Saturday', 'Sunday'].filter((d) => daySet.has(d))
   }, [project.stages])
 
-  const [selectedEvening, setSelectedEvening] = useState<string>(() => activeEvenings[0] ?? 'Thursday')
+  const selectedEvening =
+    activeEvenings.find((e) => e.toLowerCase() === day?.toLowerCase()) ??
+    activeEvenings[0] ??
+    'Thursday'
+
+  if (!day) {
+    const target = activeEvenings[0]?.toLowerCase() ?? 'thursday'
+    return <Navigate replace to={`/project/${project.id}/lineup/${target}`} />
+  }
 
   /** Returns the next empty sequential ActiveSlot on the given evening, or null if none. */
   function findNextEmptySlot(
@@ -105,28 +114,42 @@ export function LineupView() {
     // Do NOT clear activeSlot — keep it selected so user can assign a replacement immediately
   }
 
-  /** Adds a DJ to a simultaneous stage position (1–3). Enforces the max-3 cap. */
+  /** Adds a DJ to the next available simultaneous stage position (1–3). */
   function handleAddSimultaneous(
     stageId: string,
     evening: string,
-    positionIndex: 1 | 2 | 3,
+    _positionIndex: 1 | 2 | 3,
     submissionNumber: string
   ) {
+    const positions: (1 | 2 | 3)[] = [1, 2, 3]
+    const existing = project.assignments.filter(
+      (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+    )
+    if (existing.length >= 3) return
+    const usedSet = new Set(existing.map((a) => a.positionIndex as 1 | 2 | 3))
+    const nextPos = positions.find((p) => !usedSet.has(p))
+    if (!nextPos) return
+
     setProject((prev) => {
       if (!prev) return prev
-      const existing = prev.assignments.filter(
+      const prevExisting = prev.assignments.filter(
         (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
       )
-      // Enforce max-3 cap at the data layer
-      if (existing.length >= 3) return prev
-      const assignments = [
-        ...prev.assignments.filter(
-          (a) => !(a.stageId === stageId && a.evening === evening && a.positionIndex === positionIndex)
-        ),
-        { stageId, evening, positionIndex, submissionNumber },
-      ]
-      return { ...prev, assignments }
+      if (prevExisting.length >= 3) return prev
+      const prevUsed = new Set(prevExisting.map((a) => a.positionIndex as 1 | 2 | 3))
+      const prevNextPos = positions.find((p) => !prevUsed.has(p))
+      if (!prevNextPos) return prev
+      return {
+        ...prev,
+        assignments: [...prev.assignments, { stageId, evening, positionIndex: prevNextPos, submissionNumber }],
+      }
     })
+
+    // Advance activeSlot to the next empty position after the one just filled
+    const nextFreePos = positions.find((p) => !usedSet.has(p) && p !== nextPos)
+    if (nextFreePos && activeSlot) {
+      setActiveSlot({ ...activeSlot, positionIndex: nextFreePos })
+    }
   }
 
   /** Removes a DJ from a simultaneous stage position. */
@@ -150,15 +173,8 @@ export function LineupView() {
     setShowStageConfig(false)
   }
 
-  async function handleClearLineup() {
-    setProject((prev) => {
-      if (!prev) return prev
-      const cleared = { ...prev, stages: [], assignments: [], rowCount: submissions?.length ?? 0 }
-      saveProject(cleared)
-      return cleared
-    })
-    setRowCountMismatch(false)
-    setShowClearConfirm(false)
+  function handleSelectEvening(evening: string) {
+    navigate(`/project/${project.id}/lineup/${evening.toLowerCase()}`)
   }
 
   return (
@@ -188,7 +204,7 @@ export function LineupView() {
                 stages={project.stages}
                 assignments={project.assignments}
                 selectedEvening={selectedEvening}
-                onSelectEvening={setSelectedEvening}
+                onSelectEvening={handleSelectEvening}
                 onAssign={handleAssign}
                 onRemove={handleRemove}
                 onAddSimultaneous={handleAddSimultaneous}
@@ -212,6 +228,11 @@ export function LineupView() {
               onAssign={handleAssign}
               onRemove={handleRemove}
               onAddSimultaneous={handleAddSimultaneous}
+              onRemoveSimultaneous={handleRemoveSimultaneous}
+              onPositionSelect={(pos) => setActiveSlot((prev) => prev ? { ...prev, positionIndex: pos } : prev)}
+              onSelectSlot={(slotIndex, timeLabel) =>
+                setActiveSlot((prev) => prev ? { ...prev, slotIndex, timeLabel, positionIndex: undefined } : prev)
+              }
               onClose={() => setActiveSlot(null)}
             />
           </SplitPane>
@@ -229,7 +250,7 @@ export function LineupView() {
               stages={project.stages}
               assignments={project.assignments}
               selectedEvening={selectedEvening}
-              onSelectEvening={setSelectedEvening}
+              onSelectEvening={handleSelectEvening}
               onAssign={handleAssign}
               onRemove={handleRemove}
               onAddSimultaneous={handleAddSimultaneous}
@@ -242,32 +263,6 @@ export function LineupView() {
           </div>
         )}
       </div>
-      <div className="lineup-footer">
-        <button
-          type="button"
-          className="btn-danger btn-small"
-          onClick={() => setShowClearConfirm(true)}
-        >
-          Clear Lineup
-        </button>
-      </div>
-
-      {showClearConfirm && (
-        <div className="confirm-overlay">
-          <div className="confirm-dialog">
-            <p>Clear all lineup data and stage configuration? This cannot be undone.</p>
-            <div className="confirm-actions">
-              <button type="button" className="btn-secondary" onClick={() => setShowClearConfirm(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn-danger" onClick={handleClearLineup}>
-                Clear Lineup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showStageConfig && (
         <StageConfigPanel
           stages={project.stages}

@@ -1,7 +1,4 @@
-﻿## Purpose
-Defines the behavior of the DJ selection panel used in the Lineup Builder, including how DJs are listed, filtered, and assigned to slots.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: DJ selection panel opens inline beside the lineup grid
 When a user clicks an empty or filled lineup slot, the application SHALL display a `DJSelectionPanel` as a side panel adjacent to the `LineupGrid` inside `LineupView`, replacing the existing `SlotPicker` modal. The lineup grid SHALL remain fully visible while the panel is open.
@@ -27,6 +24,30 @@ When a user clicks an empty or filled lineup slot, the application SHALL display
 #### Scenario: Panel closes on Escape or outside click
 - **WHEN** the user presses Escape or clicks outside the panel while it is open
 - **THEN** the panel SHALL close without making any assignment change
+
+### Requirement: Slot tray displays all positions for the active event
+The DJ selection panel SHALL display a slot tray at the top of the panel showing all slot positions for the currently selected event. For sequential stages, the tray shows the selected slot. For simultaneous stages, the tray shows all three positions. Each position row SHALL show the slot time (or stage time window for simultaneous), the assigned DJ's name, and the assigned DJ's genre. Empty positions SHALL be displayed as drop targets.
+
+#### Scenario: Sequential slot tray shows the selected slot
+- **WHEN** the user has selected a sequential stage slot
+- **THEN** the slot tray SHALL display one row showing the slot's time label, the assigned DJ name and genre (or an "Empty" placeholder if unassigned)
+- **THEN** the slot row SHALL be highlighted as active
+
+#### Scenario: Simultaneous event tray shows all three positions
+- **WHEN** the user has selected a simultaneous stage event
+- **THEN** the slot tray SHALL display up to three position rows (Position 1, 2, 3)
+- **THEN** each row SHALL show the position label, the assigned DJ's name and genre, or an "Empty" placeholder
+- **THEN** the currently active position SHALL be highlighted
+
+#### Scenario: Empty slot position is a drag-and-drop target
+- **WHEN** a slot tray row shows an empty/unassigned position
+- **THEN** it SHALL accept a DJ card dragged from the available DJ list
+- **THEN** dropping a DJ card on the empty position SHALL assign that DJ to that position
+
+#### Scenario: Slot tray position colored with stage color
+- **WHEN** the active stage has a configured color
+- **THEN** assigned slot tray rows SHALL display a color tint matching the stage's color
+- **THEN** empty slot tray rows SHALL display without a color tint
 
 ### Requirement: DJ selection panel lists available DJs with relevant columns
 The panel SHALL display only DJs who are available on the active slot's evening, are not already assigned elsewhere in the lineup, and are **not discarded**. Each row SHALL show: DJ Name (or anonymous ID when hidden-names is active), active-context score, Genre (display only), Format/Gear (display only), Stage Preferences, and Vibefit (Moonlight context only). The list SHALL default to sorting by active-context score descending. When a focus stage is active, DJs SHALL be grouped by their preference rank for that stage rather than shown as a flat list. The panel SHALL fill the width of its container rather than using a fixed width.
@@ -69,64 +90,6 @@ The panel SHALL display only DJs who are available on the active slot's evening,
 - **WHEN** the active app context is Standard
 - **THEN** no Vibefit column SHALL be rendered in the panel
 
-#### Scenario: Hidden-names mode masks DJ names in the panel
-- **WHEN** `hiddenNames` is true and the panel is open
-- **THEN** each DJ row SHALL show `DJ #N` (1-based load-order index) instead of the real name
-
-#### Scenario: Panel fills its container width
-- **WHEN** the DJ selection panel is rendered inside a resizable split pane
-- **THEN** the panel SHALL expand to fill the available width of its container
-- **THEN** no fixed pixel width SHALL constrain the panel
-
-#### Scenario: Column widths accommodate all columns without overflow
-- **WHEN** the DJ selection panel is rendered at its minimum usable width
-- **THEN** all columns (Score, DJ Name, Genre, Format/Gear, Stage Prefs, Vibefit) SHALL be visible without horizontal scroll
-- **THEN** text columns SHALL use fluid widths (`minmax(0, 1fr)`) to share available space proportionally
-
-### Requirement: DJ cards in the panel are draggable onto lineup slot cells
-The `DJSelectionPanel` SHALL support HTML5 drag-and-drop. DJ rows/cards SHALL be draggable. Lineup slot cells in `LineupGrid` SHALL be valid drop targets. Dropping a DJ card onto a slot cell SHALL assign that DJ to that slot.
-
-#### Scenario: User drags a DJ card onto a target slot
-- **WHEN** the user starts dragging a DJ card from the selection panel
-- **THEN** slot cells in the lineup grid SHALL visually indicate they are valid drop targets
-- **WHEN** the user drops the DJ card onto an empty or filled slot cell
-- **THEN** the DJ SHALL be assigned to that slot
-- **THEN** any previously assigned DJ in that slot SHALL be replaced
-
-#### Scenario: Drag onto the same slot is a no-op
-- **WHEN** the user drags the currently assigned DJ from the panel and drops it onto the same slot
-- **THEN** the assignment SHALL remain unchanged
-
-#### Scenario: Clicking a DJ card also assigns them (non-drag fallback)
-- **WHEN** the user clicks a DJ row/card in the panel (without dragging)
-- **THEN** that DJ SHALL be assigned to the active slot
-- **THEN** the panel SHALL close
-
-### Requirement: Slot tray displays all positions for the active event
-The DJ selection panel SHALL display a slot tray at the top of the panel showing all slot positions for the currently selected event. For sequential stages, the tray shows all time slots for the stage on that evening. For simultaneous stages, the tray shows all three positions. Each position row SHALL show the slot time (or position label for simultaneous), the assigned DJ's name, and the assigned DJ's genre. Empty positions SHALL be displayed as drop targets.
-
-#### Scenario: Sequential slot tray shows all time slots for the evening
-- **WHEN** the user has selected a sequential stage slot
-- **THEN** the slot tray SHALL display one row per time slot for that stage on the evening
-- **THEN** the currently active slot row SHALL be highlighted
-- **THEN** clicking an inactive slot row SHALL navigate the active slot to that time
-
-#### Scenario: Simultaneous event tray shows all three positions
-- **WHEN** the user has selected a simultaneous stage event
-- **THEN** the slot tray SHALL display up to three position rows (Position 1, 2, 3)
-- **THEN** each row SHALL show the position label, the assigned DJ's name and genre, or an "Empty" placeholder
-- **THEN** the currently active position SHALL be highlighted
-
-#### Scenario: Empty slot position is a drag-and-drop target
-- **WHEN** a slot tray row shows an empty/unassigned position
-- **THEN** it SHALL accept a DJ card dragged from the available DJ list
-- **THEN** dropping a DJ card on the empty position SHALL assign that DJ to that position
-
-#### Scenario: Slot tray position colored with stage color
-- **WHEN** the active stage has a configured color
-- **THEN** assigned slot tray rows SHALL display a color tint matching the stage's color
-- **THEN** empty slot tray rows SHALL display without a color tint
-
 ### Requirement: Simultaneous stage DJ assignment fills the next empty position
 When a DJ is selected for assignment to a simultaneous stage, the application SHALL assign them to the next available (empty) position rather than the specific position that was active at the time of clicking "Add DJ". If all positions are full when the assignment is processed, the assignment SHALL be rejected.
 
@@ -144,4 +107,3 @@ When a DJ is selected for assignment to a simultaneous stage, the application SH
 - **WHEN** all three positions of a simultaneous stage are assigned
 - **THEN** the "Add DJ" affordance SHALL be hidden in both the grid cell and the slot tray
 - **THEN** no further DJ cards SHALL be assignable to that event by clicking
-

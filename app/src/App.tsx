@@ -190,6 +190,7 @@ function App() {
           <Route path="submissions" element={<SubmissionsView />} />
           <Route path="submissions/:djIndex" element={<SubmissionsView />} />
           <Route path="lineup" element={<LineupView />} />
+          <Route path="lineup/:day" element={<LineupView />} />
           <Route path="results" element={<ResultsList />} />
         </Route>
       </Routes>

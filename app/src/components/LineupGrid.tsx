@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis } from '../lineupUtils.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 
@@ -180,7 +180,7 @@ export function LineupGrid({
           {!hasTimeAxis && hasSimultaneous && (
             <>
               <div className="grid-cell grid-time-label">—</div>
-              {eveningStages.map((stage) => {
+              {eveningStages.map((stage, stageIndex) => {
                 if ((stage.stageType ?? 'sequential') === 'sequential') {
                   return (
                     <div key={stage.id} className="grid-cell grid-slot grid-slot--unconfigured">
@@ -201,7 +201,9 @@ export function LineupGrid({
                       if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
                     }}
                     onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
-                    rowSpan={1}
+                    gridRowStart={2}
+                    gridRowEnd={3}
+                    gridColumn={stageIndex + 2}
                     color={stageColorMap[stage.id]}
                   />
                 )
@@ -228,10 +230,15 @@ export function LineupGrid({
                 <div key={`time-${timeLabel}`} className="grid-cell grid-time-label">
                   {timeLabel}
                 </div>
-                {eveningStages.map((stage) => {
-                  // Simultaneous stages span all rows — only render their cell on the first row
+                {eveningStages.map((stage, stageIndex) => {
+                  // Simultaneous stages use explicit grid placement to span their time range.
                   if (stage.stageType === 'simultaneous') {
-                    if (rowIndex === 0) {
+                    const colIndex = stageIndex + 2 // 1-based CSS col (col 1 = time gutter)
+                    const { gridRowStart, gridRowEnd } = getSimultaneousRowRange(stage, evening, timeAxis)
+                    const startRowIdx = gridRowStart - 2 // convert to 0-based timeAxis index
+                    const cellRow = rowIndex + 2 // 1-based CSS row for this timeAxis position
+
+                    if (rowIndex === startRowIdx) {
                       return (
                         <SimultaneousCell
                           key={stage.id}
@@ -244,13 +251,27 @@ export function LineupGrid({
                             if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
                           }}
                           onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
-                          rowSpan={timeAxis.length}
+                          gridRowStart={gridRowStart}
+                          gridRowEnd={gridRowEnd}
+                          gridColumn={colIndex}
                           color={stageColorMap[stage.id]}
                         />
                       )
                     }
-                    // Remaining rows for this simultaneous column are covered by rowSpan
-                    return null
+                    if (cellRow > gridRowStart && cellRow < gridRowEnd) {
+                      // This row is visually covered by the SimultaneousCell above — skip.
+                      return null
+                    }
+                    // This row is outside the stage's configured time range.
+                    // Render an explicitly-placed placeholder so auto-placement of sequential
+                    // cells in neighbouring columns stays correctly aligned.
+                    return (
+                      <div
+                        key={`${stage.id}-${timeLabel}-off`}
+                        className="grid-cell grid-slot grid-slot--out-of-range"
+                        style={{ gridColumn: colIndex, gridRow: cellRow }}
+                      />
+                    )
                   }
 
                   // Sequential stage cell rendering
@@ -337,7 +358,10 @@ interface SimultaneousCellProps {
   nextPosition: 1 | 2 | 3 | null
   onAddClick: () => void
   onRemove: (positionIndex: 1 | 2 | 3) => void
-  rowSpan: number
+  gridRowStart: number
+  gridRowEnd: number
+  /** 1-based CSS grid column (col 1 = time gutter, col 2 = first stage). */
+  gridColumn: number
   color?: string
 }
 
@@ -346,14 +370,17 @@ function SimultaneousCell({
   nextPosition,
   onAddClick,
   onRemove,
-  rowSpan,
+  gridRowStart,
+  gridRowEnd,
+  gridColumn,
   color,
 }: SimultaneousCellProps) {
   return (
     <div
       className="grid-cell grid-slot grid-slot--simultaneous"
       style={{
-        gridRow: `span ${rowSpan}`,
+        gridRow: `${gridRowStart} / ${gridRowEnd}`,
+        gridColumn,
         ...(color ? { borderColor: color, backgroundColor: hexToTint(color, 0.12) } : {}),
       }}
     >

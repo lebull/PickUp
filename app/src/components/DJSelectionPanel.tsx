@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
+import { hexToTint } from '../stageColors.ts'
+import { getSlotLabels } from '../lineupUtils.ts'
 
 export interface ActiveSlot {
   stageId: string
@@ -21,6 +23,10 @@ interface Props {
   onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
   onRemove: (stageId: string, evening: string, slotIndex: number) => void
   onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
+  onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3) => void
+  onPositionSelect: (positionIndex: 1 | 2 | 3) => void
+  /** Called when the user clicks a sequential slot row in the tray to change the active slot. */
+  onSelectSlot: (slotIndex: number, timeLabel: string) => void
   onClose: () => void
 }
 
@@ -40,6 +46,127 @@ function getPreferenceRank(s: Submission, stage: string): number {
   return 4 // not listed
 }
 
+// ── SlotTray ──────────────────────────────────────────────────────────────────
+
+interface SlotTrayProps {
+  activeSlot: ActiveSlot
+  /** All time-label rows for the sequential stage on this evening (empty for simultaneous). */
+  stageSlotLabels: string[]
+  stageAssignments: SlotAssignment[]
+  submissions: Submission[]
+  stageColor?: string
+  getDisplayName: (submissionNumber: string) => string
+  onAssignSequential: (slotIndex: number, submissionNumber: string) => void
+  onAssignSimultaneous: (positionIndex: 1 | 2 | 3, submissionNumber: string) => void
+  onRemoveSequential: (slotIndex: number) => void
+  onRemoveSimultaneous: (positionIndex: 1 | 2 | 3) => void
+  onSelectPosition: (positionIndex: 1 | 2 | 3) => void
+  onSelectSlot: (slotIndex: number, timeLabel: string) => void
+}
+
+function SlotTray({
+  activeSlot,
+  stageSlotLabels,
+  stageAssignments,
+  submissions,
+  stageColor,
+  getDisplayName,
+  onAssignSequential,
+  onAssignSimultaneous,
+  onRemoveSequential,
+  onRemoveSimultaneous,
+  onSelectPosition,
+  onSelectSlot,
+}: SlotTrayProps) {
+  const isSimultaneous = activeSlot.positionIndex != null
+
+  function getGenre(submissionNumber: string): string {
+    return submissions.find((s) => s.submissionNumber === submissionNumber)?.genre || '—'
+  }
+
+  if (!isSimultaneous) {
+    return (
+      <div className="slot-tray">
+        {stageSlotLabels.map((label, slotIdx) => {
+          const assignment = stageAssignments.find(
+            (a) => a.slotIndex === slotIdx && a.positionIndex == null
+          )
+          const isActive = activeSlot.slotIndex === slotIdx
+          const rowStyle = stageColor && assignment ? { backgroundColor: hexToTint(stageColor, 0.15) } : undefined
+          return (
+            <div
+              key={label}
+              className={`slot-tray-row${isActive ? ' slot-tray-row--active' : ''}${assignment ? '' : ' slot-tray-row--empty'}`}
+              style={rowStyle}
+              onClick={!isActive ? () => onSelectSlot(slotIdx, label) : undefined}
+              onDragOver={!assignment ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } : undefined}
+              onDrop={!assignment ? (e) => {
+                e.preventDefault()
+                const subNum = e.dataTransfer.getData('application/dj-submission-number')
+                if (subNum) onAssignSequential(slotIdx, subNum)
+              } : undefined}
+            >
+              <span className="slot-tray-time">{label}</span>
+              {assignment ? (
+                <>
+                  <span className="slot-tray-dj-name">{getDisplayName(assignment.submissionNumber)}</span>
+                  <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
+                  <button type="button" className="slot-tray-remove-btn" onClick={(e) => { e.stopPropagation(); onRemoveSequential(slotIdx) }}>
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <span className="slot-tray-empty">Empty — drag a DJ here</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  return (
+    <div className="slot-tray">
+      {([1, 2, 3] as const).map((pos) => {
+        const assignment = stageAssignments.find((a) => a.positionIndex === pos)
+        const isActive = activeSlot.positionIndex === pos
+        const rowStyle = stageColor && assignment ? { backgroundColor: hexToTint(stageColor, 0.15) } : undefined
+        return (
+          <div
+            key={pos}
+            className={`slot-tray-row${isActive ? ' slot-tray-row--active' : ''}${assignment ? '' : ' slot-tray-row--empty'}`}
+            style={rowStyle}
+            onClick={() => onSelectPosition(pos)}
+            onDragOver={!assignment ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } : undefined}
+            onDrop={!assignment ? (e) => {
+              e.preventDefault()
+              const subNum = e.dataTransfer.getData('application/dj-submission-number')
+              if (subNum) onAssignSimultaneous(pos, subNum)
+            } : undefined}
+          >
+            <span className="slot-tray-time">Pos {pos}</span>
+            {assignment ? (
+              <>
+                <span className="slot-tray-dj-name">{getDisplayName(assignment.submissionNumber)}</span>
+                <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
+                <button
+                  type="button"
+                  className="slot-tray-remove-btn"
+                  onClick={(e) => { e.stopPropagation(); onRemoveSimultaneous(pos) }}
+                >
+                  Remove
+                </button>
+              </>
+            ) : (
+              <span className="slot-tray-empty">Empty — drag a DJ here</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function DJSelectionPanel({
   submissions,
   stages,
@@ -49,6 +176,9 @@ export function DJSelectionPanel({
   onAssign,
   onRemove,
   onAddSimultaneous,
+  onRemoveSimultaneous,
+  onPositionSelect,
+  onSelectSlot,
   onClose,
 }: Props) {
   const { appContext, hiddenNames } = useAppPreferences()
@@ -175,14 +305,14 @@ export function DJSelectionPanel({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.submissionNumber) }}
         aria-label={`Assign ${djLabel(s)}`}
       >
-        <span className="dj-col-name">{djLabel(s)}</span>
-        <span className="dj-col-score">{scoreLabel(s)}</span>
-        <span className="dj-col-genre">{s.genre || '—'}</span>
-        <span className="dj-col-format" title={s.formatGear || ''}>{s.formatGear || '—'}</span>
+        <span className="dj-col-name" title={djLabel(s)}>{djLabel(s)}</span>
+        <span className="dj-col-score" title={scoreLabel(s)}>{scoreLabel(s)}</span>
+        <span className="dj-col-genre" title={s.genre || '—'}>{s.genre || '—'}</span>
+        <span className="dj-col-format" title={s.formatGear || '—'}>{s.formatGear || '—'}</span>
         {appContext === 'moonlight' && (
-          <span className="dj-col-vibefit">{s.mlVibefit || '—'}</span>
+          <span className="dj-col-vibefit" title={s.mlVibefit || '—'}>{s.mlVibefit || '—'}</span>
         )}
-        <span className="dj-col-stages">
+        <span className="dj-col-stages" title={s.stagePreferences.filter(Boolean).join(', ') || '—'}>
           {s.stagePreferences.filter(Boolean).join(', ') || '—'}
         </span>
       </div>
@@ -196,10 +326,7 @@ export function DJSelectionPanel({
         <div className="dj-panel-title">
           <strong>{stage?.name ?? 'Stage'}</strong>
           <span className="dj-panel-slot-label">
-            {activeSlot.evening} ·{' '}
-            {isSimultaneous
-              ? `Silent Disco — Position ${activeSlot.positionIndex}`
-              : activeSlot.timeLabel}
+            {activeSlot.evening}{isSimultaneous ? ' · Silent Disco' : ` · ${activeSlot.timeLabel}`}
           </span>
         </div>
         <button type="button" className="close-btn" onClick={onClose} aria-label="Close panel">
@@ -207,34 +334,39 @@ export function DJSelectionPanel({
         </button>
       </div>
 
-      {/* Current assignment */}
-      {currentAssignment && (
-        <div className="dj-panel-current">
-          <span>
-            Current:{' '}
-            <strong>
-              {(() => {
-                const sub = submissions.find((s) => s.submissionNumber === currentAssignment.submissionNumber)
-                if (hiddenNames) {
-                  const origIndex = submissions.indexOf(sub!)
-                  return origIndex >= 0 ? `DJ #${origIndex + 1}` : currentAssignment.submissionNumber
-                }
-                return sub?.djName ?? currentAssignment.submissionNumber
-              })()}
-            </strong>
-          </span>
-          <button
-            type="button"
-            className="btn-danger btn-small"
-            onClick={() => {
-              onRemove(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!)
-              // Panel stays open — slot remains selected for immediate re-assignment
-            }}
-          >
-            Remove
-          </button>
-        </div>
-      )}
+      {/* Slot tray */}
+      <SlotTray
+        activeSlot={activeSlot}
+        stageSlotLabels={stage ? getSlotLabels(stage, activeSlot.evening) : []}
+        stageAssignments={assignments.filter(
+          (a) => a.stageId === activeSlot.stageId && a.evening === activeSlot.evening
+        )}
+        submissions={submissions}
+        stageColor={stage?.color}
+        getDisplayName={(subNum) => {
+          const s = submissions.find((sub) => sub.submissionNumber === subNum)
+          if (!s) return subNum
+          if (hiddenNames) {
+            const origIndex = submissions.indexOf(s)
+            return origIndex >= 0 ? `DJ #${origIndex + 1}` : subNum
+          }
+          return s.djName
+        }}
+        onAssignSequential={(slotIndex, subNum) =>
+          onAssign(activeSlot.stageId, activeSlot.evening, slotIndex, subNum)
+        }
+        onAssignSimultaneous={(pos, subNum) =>
+          onAddSimultaneous(activeSlot.stageId, activeSlot.evening, pos, subNum)
+        }
+        onRemoveSequential={(slotIndex) =>
+          onRemove(activeSlot.stageId, activeSlot.evening, slotIndex)
+        }
+        onRemoveSimultaneous={(pos) =>
+          onRemoveSimultaneous(activeSlot.stageId, activeSlot.evening, pos)
+        }
+        onSelectPosition={onPositionSelect}
+        onSelectSlot={onSelectSlot}
+      />
 
       {/* Focus-stage selector */}
       {prefStageNames.length > 0 && (

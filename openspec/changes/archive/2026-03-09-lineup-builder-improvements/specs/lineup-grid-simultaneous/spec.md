@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Render simultaneous stage columns without slot rows
 The Lineup Grid SHALL render simultaneous stage columns as a cell that spans the portion of the time axis corresponding to the stage's configured start and end times for the selected evening, rather than spanning the full height of the grid. When a simultaneous stage has no schedule configured for the selected evening, it SHALL fall back to spanning the full height of the time axis. The cell SHALL display the names of all currently assigned DJs stacked vertically, one per position.
@@ -40,12 +40,8 @@ The Lineup Grid SHALL render simultaneous stage columns as a cell that spans the
 - **THEN** the DJ reappears in the unscheduled pool
 - **THEN** the "Add DJ" control reappears if it was hidden
 
-### Requirement: DJ pool exclusion applies to simultaneous assignments
-The unscheduled DJ pool SHALL exclude any DJ assigned to a simultaneous stage, consistent with the global exclusion rule for sequential assignments.
+## REMOVED Requirements
 
-#### Scenario: DJ assigned to simultaneous stage removed from pool
-- **WHEN** a DJ is assigned to any position on a simultaneous stage
-- **THEN** that DJ SHALL NOT appear in the unscheduled pool panel regardless of the currently viewed evening
-
-~~### Requirement: Clear Lineup action~~
-~~**Removed**: The "Clear Lineup" button was destructive, rarely useful, and added visual noise to the lineup footer. Users can achieve the same result by deleting and recreating the project.~~
+### Requirement: Clear Lineup action
+**Reason**: The "Clear Lineup" button is destructive, rarely useful, and adds visual noise to the lineup footer. Users can achieve the same result by deleting and recreating the project.
+**Migration**: No migration needed. Existing lineup data is unaffected; the action is simply no longer available from the UI.
