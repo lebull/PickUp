@@ -175,6 +175,39 @@
   font-size: 0.875rem;
 }
 
+.dj-search {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #e8e8e8;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  width: 14rem;
+  outline: none;
+}
+.dj-search::placeholder {
+  color: #666;
+}
+.dj-search:focus {
+  border-color: #666;
+}
+
+.stage-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  color: #ccc;
+  cursor: pointer;
+  user-select: none;
+}
+.stage-toggle-label input[type='checkbox'] {
+  accent-color: #888;
+  width: 0.9rem;
+  height: 0.9rem;
+  cursor: pointer;
+}
+
 /* List table */
 .submission-table-wrapper {
   overflow-x: auto;

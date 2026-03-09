@@ -33,7 +33,6 @@ export function SplitPane({ initialSplit = 50, minLeft = 10, minRight = 10, chil
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
     window.removeEventListener('pointermove', onPointerMove)
-    window.removeEventListener('pointerup', onPointerUp)
   }, [onPointerMove])
 
   function onDividerPointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -43,7 +42,7 @@ export function SplitPane({ initialSplit = 50, minLeft = 10, minRight = 10, chil
     document.body.style.userSelect = 'none'
     ;(e.target as HTMLDivElement).setPointerCapture(e.pointerId)
     window.addEventListener('pointermove', onPointerMove)
-    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointerup', onPointerUp, { once: true })
   }
 
   // Cleanup on unmount

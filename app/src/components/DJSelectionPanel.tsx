@@ -69,10 +69,12 @@ export function DJSelectionPanel({
     return [...seen].sort()
   }, [submissions])
 
-  // Reset focus stage only when the evening changes, not on every slot advance
-  useEffect(() => {
+  // Reset focus stage only when the evening changes (inline state reset per React docs)
+  const [lastEvening, setLastEvening] = useState(activeSlot.evening)
+  if (activeSlot.evening !== lastEvening) {
+    setLastEvening(activeSlot.evening)
     setFocusStage(null)
-  }, [activeSlot.evening])
+  }
 
   // For sequential slots: the currently assigned DJ for this exact slot
   const currentAssignment = isSimultaneous

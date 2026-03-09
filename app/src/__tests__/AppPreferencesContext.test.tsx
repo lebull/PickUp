@@ -15,7 +15,7 @@ describe('AppPreferencesContext', () => {
   })
 
   it('defaults to appContext "standard" and hiddenNames false', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => {
+    const Wrapper = ({ children }: { children: React.ReactNode }) => {
       const prefs = useAppPreferencesState()
       return (
         <AppPreferencesContext.Provider value={prefs}>
@@ -23,13 +23,13 @@ describe('AppPreferencesContext', () => {
         </AppPreferencesContext.Provider>
       )
     }
-    const { result } = renderHook(() => useAppPreferences(), { wrapper })
+    const { result } = renderHook(() => useAppPreferences(), { wrapper: Wrapper })
     expect(result.current.appContext).toBe('standard')
     expect(result.current.hiddenNames).toBe(false)
   })
 
   it('updates appContext when setter is called', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => {
+    const Wrapper = ({ children }: { children: React.ReactNode }) => {
       const prefs = useAppPreferencesState()
       return (
         <AppPreferencesContext.Provider value={prefs}>
@@ -37,13 +37,13 @@ describe('AppPreferencesContext', () => {
         </AppPreferencesContext.Provider>
       )
     }
-    const { result } = renderHook(() => useAppPreferences(), { wrapper })
+    const { result } = renderHook(() => useAppPreferences(), { wrapper: Wrapper })
     act(() => result.current.setAppContext('moonlight'))
     expect(result.current.appContext).toBe('moonlight')
   })
 
   it('updates hiddenNames when setter is called', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => {
+    const Wrapper = ({ children }: { children: React.ReactNode }) => {
       const prefs = useAppPreferencesState()
       return (
         <AppPreferencesContext.Provider value={prefs}>
@@ -51,7 +51,7 @@ describe('AppPreferencesContext', () => {
         </AppPreferencesContext.Provider>
       )
     }
-    const { result } = renderHook(() => useAppPreferences(), { wrapper })
+    const { result } = renderHook(() => useAppPreferences(), { wrapper: Wrapper })
     act(() => result.current.setHiddenNames(true))
     expect(result.current.hiddenNames).toBe(true)
   })

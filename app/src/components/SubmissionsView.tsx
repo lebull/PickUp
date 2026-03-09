@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProjectContext } from '../ProjectContext.ts'
 import { SubmissionList } from './SubmissionList.tsx'
@@ -36,14 +36,18 @@ export function SubmissionsView() {
   const [sortField, setSortField] = useState<SortField>('number')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [scoreMetric, setScoreMetric] = useState<ScoreMetric>('avg')
-  const [activeDays, setActiveDays] = useState<Set<string>>(new Set())
+  const [nameSearch, setNameSearch] = useState('')
+  const [showStageAssignments, setShowStageAssignments] = useState(false)
   const [cursorIndex, setCursorIndex] = useState<number | null>(null)
 
-  // Reset sort to submission number when appContext changes
-  useEffect(() => {
+  // Reset sort and search when appContext changes (inline state reset per React docs)
+  const [lastContext, setLastContext] = useState(appContext)
+  if (appContext !== lastContext) {
+    setLastContext(appContext)
     setSortField('number')
     setSortDir('asc')
-  }, [appContext])
+    setNameSearch('')
+  }
 
   if (submissions === null) return null
 
@@ -60,15 +64,6 @@ export function SubmissionsView() {
       setSortField(field)
       setSortDir('desc')
     }
-  }
-
-  function handleDayToggle(day: string) {
-    setActiveDays((prev) => {
-      const next = new Set(prev)
-      if (next.has(day)) next.delete(day)
-      else next.add(day)
-      return next
-    })
   }
 
   function handleSelect(index: number, displayedIndex: number) {
@@ -91,7 +86,8 @@ export function SubmissionsView() {
           sortField={sortField}
           sortDir={sortDir}
           scoreMetric={scoreMetric}
-          activeDays={activeDays}
+          nameSearch={nameSearch}
+          showStageAssignments={showStageAssignments}
           cursorIndex={cursorIndex}
           lineupSubmissionNumbers={lineupSubmissionNumbers}
           discardedSubmissionNumbers={discardedSubmissionNumbers}
@@ -99,7 +95,8 @@ export function SubmissionsView() {
           appContext={appContext}
           onHeaderClick={handleHeaderClick}
           onMetricChange={setScoreMetric}
-          onDayToggle={handleDayToggle}
+          onNameSearchChange={setNameSearch}
+          onStageAssignmentsToggle={setShowStageAssignments}
           onSelect={handleSelect}
           onCursorChange={setCursorIndex}
           listRef={listRef}

@@ -9,8 +9,6 @@ export type SortDir = 'asc' | 'desc'
 export type ScoreMetric = 'avg' | 'sum'
 export type RowState = 'discarded' | 'in-lineup' | 'duplicate-name' | 'none'
 
-const DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday']
-
 function getScore(s: Submission, field: SortField, metric: ScoreMetric): number | null {
   if (field === 'main') return metric === 'avg' ? s.mainScore.avg : s.mainScore.sum
   if (field === 'ml') return metric === 'avg' ? s.mlScore.avg : s.mlScore.sum
@@ -27,6 +25,24 @@ function displayScore(s: Submission, field: 'main' | 'ml', metric: ScoreMetric):
     : fmt(metric === 'avg' ? s.mlScore.avg : s.mlScore.sum)
 }
 
+interface StageBadgeProps {
+  name: string | undefined
+  color: string | undefined
+}
+
+function StageBadge({ name, color }: StageBadgeProps) {
+  return (
+    <span
+      className="lineup-badge"
+      style={color
+        ? { backgroundColor: hexToTint(color, 0.25), borderColor: color, color }
+        : undefined}
+    >
+      {name ?? '—'}
+    </span>
+  )
+}
+
 interface Props {
   submissions: Submission[]
   stages: Stage[]
@@ -34,7 +50,8 @@ interface Props {
   sortField: SortField
   sortDir: SortDir
   scoreMetric: ScoreMetric
-  activeDays: Set<string>
+  nameSearch: string
+  showStageAssignments: boolean
   cursorIndex: number | null
   lineupSubmissionNumbers: Set<string>
   discardedSubmissionNumbers: Set<string>
@@ -43,7 +60,8 @@ interface Props {
   listRef: RefObject<HTMLDivElement | null>
   onHeaderClick: (field: SortField) => void
   onMetricChange: (metric: ScoreMetric) => void
-  onDayToggle: (day: string) => void
+  onNameSearchChange: (value: string) => void
+  onStageAssignmentsToggle: (value: boolean) => void
   onSelect: (origIndex: number, displayedIndex: number) => void
   onCursorChange: (index: number | null) => void
 }
@@ -55,7 +73,8 @@ export function SubmissionList({
   sortField,
   sortDir,
   scoreMetric,
-  activeDays,
+  nameSearch,
+  showStageAssignments,
   cursorIndex,
   lineupSubmissionNumbers,
   discardedSubmissionNumbers,
@@ -64,16 +83,21 @@ export function SubmissionList({
   listRef,
   onHeaderClick,
   onMetricChange,
-  onDayToggle,
+  onNameSearchChange,
+  onStageAssignmentsToggle,
   onSelect,
   onCursorChange,
 }: Props) {
   const filtered = useMemo(() => {
-    if (activeDays.size === 0) return submissions
-    return submissions.filter((s) =>
-      [...activeDays].some((day) => s.daysAvailable.toLowerCase().includes(day.toLowerCase()))
-    )
-  }, [submissions, activeDays])
+    if (!nameSearch.trim()) return submissions
+    const query = nameSearch.trim().toLowerCase()
+    return submissions.filter((s) => {
+      const label = hiddenNames
+        ? `dj #${submissions.indexOf(s) + 1}`
+        : s.djName.toLowerCase()
+      return label.includes(query)
+    })
+  }, [submissions, nameSearch, hiddenNames])
 
   const sorted = useMemo(() => {
     if (sortField === null) return filtered
@@ -98,7 +122,7 @@ export function SubmissionList({
     })
   }, [filtered, sortField, sortDir, scoreMetric])
 
-  // Task 3.2: compute set of djNames that appear in more than one non-discarded submission
+  // Compute set of djNames that appear in more than one non-discarded submission
   const duplicateNames = useMemo(() => {
     const nameCount = new Map<string, number>()
     for (const s of submissions) {
@@ -113,14 +137,14 @@ export function SubmissionList({
     return dupes
   }, [submissions, discardedSubmissionNumbers])
 
-  // Map submissionNumber → stage color hex (from any assignment) for lineup badge tinting
-  const submissionStageColor = useMemo(() => {
+  // Map submissionNumber → { color, name } (from any assignment) for lineup badge
+  const submissionStageInfo = useMemo(() => {
     const stageById = new Map(stages.map((s) => [s.id, s]))
-    const map = new Map<string, string | undefined>()
+    const map = new Map<string, { color: string | undefined; name: string | undefined }>()
     for (const a of assignments) {
       if (!map.has(a.submissionNumber)) {
-        const color = stageById.get(a.stageId)?.color
-        map.set(a.submissionNumber, color)
+        const stage = stageById.get(a.stageId)
+        map.set(a.submissionNumber, { color: stage?.color, name: stage?.name })
       }
     }
     return map
@@ -128,17 +152,22 @@ export function SubmissionList({
 
   // Keyboard navigation handler attached to the list container
   useEffect(() => {
-    const el = listRef.current
+    const el: HTMLDivElement | null = listRef.current
     if (!el) return
+    const container: HTMLDivElement = el
 
     function onKeyDown(e: KeyboardEvent) {
       if (sorted.length === 0) return
-      if (e.key === 'ArrowDown') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
-        onCursorChange(Math.min((cursorIndex ?? -1) + 1, sorted.length - 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        onCursorChange(Math.max((cursorIndex ?? sorted.length) - 1, 0))
+        const newIndex = e.key === 'ArrowDown'
+          ? Math.min((cursorIndex ?? -1) + 1, sorted.length - 1)
+          : Math.max((cursorIndex ?? sorted.length) - 1, 0)
+        onCursorChange(newIndex)
+        const s = sorted[newIndex]
+        if (s) onSelect(submissions.indexOf(s), newIndex)
+        const row = container.querySelector(`[data-displayed-index="${newIndex}"]`)
+        row?.scrollIntoView({ block: 'nearest' })
       } else if ((e.key === 'Enter' || e.key === ' ') && cursorIndex !== null) {
         e.preventDefault()
         const s = sorted[cursorIndex]
@@ -165,18 +194,23 @@ export function SubmissionList({
             <option value="sum">Sum</option>
           </select>
         </label>
-        <div className="day-toggles">
-          {DAYS.map((day) => (
-            <button
-              key={day}
-              type="button"
-              className={`day-btn${activeDays.has(day) ? ' active' : ''}`}
-              onClick={() => onDayToggle(day)}
-            >
-              {day}
-            </button>
-          ))}
-        </div>
+        <label className="search-label">
+          <input
+            type="search"
+            className="dj-search"
+            placeholder="Search DJ name"
+            value={nameSearch}
+            onChange={(e) => onNameSearchChange(e.target.value)}
+          />
+        </label>
+        <label className="stage-toggle-label">
+          <input
+            type="checkbox"
+            checked={showStageAssignments}
+            onChange={(e) => onStageAssignmentsToggle(e.target.checked)}
+          />
+          {' '}View stage assignments
+        </label>
         <span className="submission-count-label">
           {filtered.length < submissions.length
             ? `${filtered.length} / ${submissions.length} submissions`
@@ -194,6 +228,7 @@ export function SubmissionList({
                 # {arrow('number')}
               </th>
               <th>DJ Name</th>
+              {showStageAssignments && <th>Stage Assignment</th>}
               <th
                 className={`th-sortable${sortField === 'main' ? ' th-active' : ''}`}
                 onClick={() => onHeaderClick('main')}
@@ -220,44 +255,43 @@ export function SubmissionList({
               const isDuplicate = !isDiscarded && duplicateNames.has(s.djName)
               const isCursor = cursorIndex === displayedIndex
 
-              // Task 3.3: priority-ordered row state
               const rowState: RowState = isDiscarded ? 'discarded'
-                : inLineup ? 'in-lineup'
-                : isDuplicate ? 'duplicate-name'
-                : 'none'
+                : inLineup ? (showStageAssignments ? 'in-lineup' : 'none')
+                  : isDuplicate ? 'duplicate-name'
+                    : 'none'
+
+              const stageInfo = submissionStageInfo.get(s.submissionNumber)
 
               const rowClass = [
                 'submission-row',
                 rowState !== 'none' ? rowState : '',
                 isCursor ? 'row-cursor' : '',
               ].filter(Boolean).join(' ')
-              const inLineupColor = rowState === 'in-lineup' ? submissionStageColor.get(s.submissionNumber) : undefined
+
+              const rowStyle = showStageAssignments && stageInfo?.color
+                ? { '--stage-color': stageInfo.color } as React.CSSProperties
+                : undefined
+
               return (
                 <tr
                   key={origIndex}
+                  data-displayed-index={displayedIndex}
                   className={rowClass}
-                  style={inLineupColor ? { '--stage-color': inLineupColor } as React.CSSProperties : undefined}
+                  style={rowStyle}
                   onClick={() => onSelect(origIndex, displayedIndex)}
                 >
                   <td>{origIndex + 1}</td>
+
                   <td>
                     {hiddenNames ? `DJ #${origIndex + 1}` : s.djName}
-                    {rowState === 'in-lineup' && (() => {
-                      const color = submissionStageColor.get(s.submissionNumber)
-                      return (
-                        <span
-                          className="lineup-badge"
-                          style={color
-                            ? { backgroundColor: hexToTint(color, 0.25), borderColor: color, color: color }
-                            : undefined}
-                        >
-                          ✓ In Lineup
-                        </span>
-                      )
-                    })()}
                     {rowState === 'discarded' && <span className="discarded-badge">✕ Discarded</span>}
                     {rowState === 'duplicate-name' && <span className="duplicate-badge">⚠ Duplicate Name</span>}
-                  </td>
+                  </td> 
+                  {showStageAssignments && (
+                    <td>
+                      {stageInfo && <StageBadge name={stageInfo.name} color={stageInfo.color} />}
+                    </td>
+                  )}
                   <td>
                     {displayScore(s, 'main', scoreMetric)}
                     {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored">*</span>}
