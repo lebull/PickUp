@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Visual indicator for DJs present in the lineup
 The submission list SHALL display a visual indicator on each row reflecting the row's current state. State is determined by priority order: `discarded` > `in-lineup` > `duplicate-name` > `none`. Matching for `in-lineup` SHALL be performed by `submissionNumber`. Matching for `discarded` SHALL check `project.discardedSubmissions`. Matching for `duplicate-name` SHALL check whether any other non-discarded submission shares the same `djName`. When a submission is in the lineup and the assigned stage has a color, the "in-lineup" badge SHALL be tinted with that stage's palette color.

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { Stage, SlotAssignment } from '../types.ts'
 import { CONVENTION_DAYS, getSlotLabels } from '../lineupUtils.ts'
+import { STAGE_COLOR_PALETTE } from '../stageColors.ts'
 
 interface Props {
   stages: Stage[]
@@ -23,6 +24,8 @@ function newStage(): Stage {
 export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props) {
   const [draft, setDraft] = useState<Stage[]>(() => stages.map((s) => ({ ...s, schedule: { ...s.schedule } })))
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const dragIndexRef = useRef<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   function updateStage(id: string, patch: Partial<Stage>) {
     setDraft((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
@@ -80,6 +83,44 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
     setPendingDelete(null)
   }
 
+  function setStageColor(id: string, color: string | undefined) {
+    setDraft((prev) => prev.map((s) => (s.id === id ? { ...s, color } : s)))
+  }
+
+  // ── Drag-to-reorder handlers ──────────────────────────────
+  function handleDragStart(index: number) {
+    dragIndexRef.current = index
+  }
+
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverIndex(index)
+  }
+
+  function handleDrop(e: React.DragEvent, dropIndex: number) {
+    e.preventDefault()
+    const fromIndex = dragIndexRef.current
+    if (fromIndex === null || fromIndex === dropIndex) {
+      dragIndexRef.current = null
+      setDragOverIndex(null)
+      return
+    }
+    setDraft((prev) => {
+      const next = [...prev]
+      const [removed] = next.splice(fromIndex, 1)
+      next.splice(dropIndex, 0, removed)
+      return next
+    })
+    dragIndexRef.current = null
+    setDragOverIndex(null)
+  }
+
+  function handleDragEnd() {
+    dragIndexRef.current = null
+    setDragOverIndex(null)
+  }
+
   return (
     <div className="stage-config-overlay">
       <div className="stage-config-panel">
@@ -89,11 +130,16 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
         </div>
 
         <div className="stage-config-list">
-          {draft.map((stage) => {
+          {draft.map((stage, index) => {
             const assignmentCount = assignments.filter((a) => a.stageId === stage.id).length
 
             return (
-              <div key={stage.id} className="stage-config-row">
+              <div
+                key={stage.id}
+                className={`stage-config-row${dragOverIndex === index ? ' stage-config-row--drag-over' : ''}`}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+              >
                 {pendingDelete === stage.id ? (
                   <div className="delete-confirm">
                     <span>
@@ -110,6 +156,15 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                 ) : (
                   <>
                     <div className="stage-field-row">
+                      <span
+                        className="stage-drag-handle"
+                        draggable
+                        onDragStart={() => handleDragStart(index)}
+                        onDragEnd={handleDragEnd}
+                        title="Drag to reorder"
+                      >
+                        ⠿
+                      </span>
                       <label className="stage-field-label">Name</label>
                       <input
                         className="stage-name-input"
@@ -210,6 +265,29 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                           </div>
                         )
                       })}
+                    </div>
+
+                    <div className="stage-color-swatches">
+                      <span className="stage-field-label">Color</span>
+                      {/* "No color" neutral swatch */}
+                      <button
+                        type="button"
+                        className={`stage-color-swatch stage-color-swatch--none${!stage.color ? ' stage-color-swatch--selected' : ''}`}
+                        title="No color"
+                        onClick={() => setStageColor(stage.id, undefined)}
+                      />
+                      {STAGE_COLOR_PALETTE.map((hex) => (
+                        <button
+                          key={hex}
+                          type="button"
+                          className={`stage-color-swatch${stage.color === hex ? ' stage-color-swatch--selected' : ''}`}
+                          style={{ backgroundColor: hex }}
+                          title={hex}
+                          onClick={() =>
+                            setStageColor(stage.id, stage.color === hex ? undefined : hex)
+                          }
+                        />
+                      ))}
                     </div>
                   </>
                 )}

@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import type { RefObject } from 'react'
-import type { Submission } from '../types.ts'
+import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import type { AppContextMode } from '../AppPreferencesContext.ts'
+import { hexToTint } from '../stageColors.ts'
 
 export type SortField = 'main' | 'ml' | 'number' | null
 export type SortDir = 'asc' | 'desc'
@@ -28,6 +29,8 @@ function displayScore(s: Submission, field: 'main' | 'ml', metric: ScoreMetric):
 
 interface Props {
   submissions: Submission[]
+  stages: Stage[]
+  assignments: SlotAssignment[]
   sortField: SortField
   sortDir: SortDir
   scoreMetric: ScoreMetric
@@ -47,6 +50,8 @@ interface Props {
 
 export function SubmissionList({
   submissions,
+  stages,
+  assignments,
   sortField,
   sortDir,
   scoreMetric,
@@ -107,6 +112,19 @@ export function SubmissionList({
     }
     return dupes
   }, [submissions, discardedSubmissionNumbers])
+
+  // Map submissionNumber → stage color hex (from any assignment) for lineup badge tinting
+  const submissionStageColor = useMemo(() => {
+    const stageById = new Map(stages.map((s) => [s.id, s]))
+    const map = new Map<string, string | undefined>()
+    for (const a of assignments) {
+      if (!map.has(a.submissionNumber)) {
+        const color = stageById.get(a.stageId)?.color
+        map.set(a.submissionNumber, color)
+      }
+    }
+    return map
+  }, [stages, assignments])
 
   // Keyboard navigation handler attached to the list container
   useEffect(() => {
@@ -213,16 +231,30 @@ export function SubmissionList({
                 rowState !== 'none' ? rowState : '',
                 isCursor ? 'row-cursor' : '',
               ].filter(Boolean).join(' ')
+              const inLineupColor = rowState === 'in-lineup' ? submissionStageColor.get(s.submissionNumber) : undefined
               return (
                 <tr
                   key={origIndex}
                   className={rowClass}
+                  style={inLineupColor ? { '--stage-color': inLineupColor } as React.CSSProperties : undefined}
                   onClick={() => onSelect(origIndex, displayedIndex)}
                 >
                   <td>{origIndex + 1}</td>
                   <td>
                     {hiddenNames ? `DJ #${origIndex + 1}` : s.djName}
-                    {rowState === 'in-lineup' && <span className="lineup-badge">✓ In Lineup</span>}
+                    {rowState === 'in-lineup' && (() => {
+                      const color = submissionStageColor.get(s.submissionNumber)
+                      return (
+                        <span
+                          className="lineup-badge"
+                          style={color
+                            ? { backgroundColor: hexToTint(color, 0.25), borderColor: color, color: color }
+                            : undefined}
+                        >
+                          ✓ In Lineup
+                        </span>
+                      )
+                    })()}
                     {rowState === 'discarded' && <span className="discarded-badge">✕ Discarded</span>}
                     {rowState === 'duplicate-name' && <span className="duplicate-badge">⚠ Duplicate Name</span>}
                   </td>

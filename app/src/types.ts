@@ -14,6 +14,8 @@ export interface Stage {
   /** Per-day schedule. Key is the day name (e.g. "Friday"). Only used for sequential stages. */
   schedule: Record<string, StageSchedule>
   slotDuration: number // minutes (sequential stages only)
+  /** Optional display color as a hex string (e.g. "#6366f1"). Chosen from the curated stage color palette. */
+  color?: string
 }
 
 export interface SlotAssignment {

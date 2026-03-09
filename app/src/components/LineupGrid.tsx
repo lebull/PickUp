@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import { getSlotLabels, getEveningTimeAxis } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
+import { hexToTint } from '../stageColors.ts'
 
 interface Props {
   submissions: Submission[]
@@ -73,6 +74,13 @@ export function LineupGrid({
     () => eveningStages.filter((s) => s.stageType === 'simultaneous'),
     [eveningStages]
   )
+
+  // Map stage id → hex color (or undefined) for quick lookup during render
+  const stageColorMap = useMemo(() => {
+    const map: Record<string, string | undefined> = {}
+    for (const s of stages) map[s.id] = s.color
+    return map
+  }, [stages])
 
   function getAssignment(stageId: string, slotIndex: number): SlotAssignment | undefined {
     return assignments.find(
@@ -153,7 +161,11 @@ export function LineupGrid({
           {/* Header row */}
           <div className="grid-cell grid-header grid-corner" />
           {eveningStages.map((stage) => (
-            <div key={stage.id} className="grid-cell grid-header grid-stage-header">
+            <div
+              key={stage.id}
+              className="grid-cell grid-header grid-stage-header"
+              style={stageColorMap[stage.id] ? { borderBottom: `3px solid ${stageColorMap[stage.id]}` } : undefined}
+            >
               {stage.name || <em>Unnamed Stage</em>}
               {stage.stageType === 'simultaneous' && (
                 <span className="stage-type-badge">silent disco</span>
@@ -190,6 +202,7 @@ export function LineupGrid({
                     }}
                     onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
                     rowSpan={1}
+                    color={stageColorMap[stage.id]}
                   />
                 )
               })}
@@ -232,6 +245,7 @@ export function LineupGrid({
                           }}
                           onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
                           rowSpan={timeAxis.length}
+                          color={stageColorMap[stage.id]}
                         />
                       )
                     }
@@ -267,11 +281,13 @@ export function LineupGrid({
                   const assignedDjName = assignment
                     ? getDisplayName(assignment.submissionNumber)
                     : null
+                  const stageColor = stageColorMap[stage.id]
                   return assignment ? (
                     <button
                       key={`${stage.id}-${timeLabel}`}
                       type="button"
                       className={`grid-cell grid-slot grid-slot--occupied${isActive ? ' grid-slot--active' : ''}`}
+                      style={stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
                       onClick={() =>
                         onSlotClick({ stageId: stage.id, evening, slotIndex, timeLabel })
                       }
@@ -322,6 +338,7 @@ interface SimultaneousCellProps {
   onAddClick: () => void
   onRemove: (positionIndex: 1 | 2 | 3) => void
   rowSpan: number
+  color?: string
 }
 
 function SimultaneousCell({
@@ -330,11 +347,15 @@ function SimultaneousCell({
   onAddClick,
   onRemove,
   rowSpan,
+  color,
 }: SimultaneousCellProps) {
   return (
     <div
       className="grid-cell grid-slot grid-slot--simultaneous"
-      style={{ gridRow: `span ${rowSpan}` }}
+      style={{
+        gridRow: `span ${rowSpan}`,
+        ...(color ? { borderColor: color, backgroundColor: hexToTint(color, 0.12) } : {}),
+      }}
     >
       <div className="simultaneous-djs">
         {assignedDJs.map((a) => (

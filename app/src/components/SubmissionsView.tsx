@@ -86,6 +86,8 @@ export function SubmissionsView() {
       >
         <SubmissionList
           submissions={submissions}
+          stages={project.stages}
+          assignments={project.assignments}
           sortField={sortField}
           sortDir={sortDir}
           scoreMetric={scoreMetric}
