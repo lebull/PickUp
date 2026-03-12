@@ -169,7 +169,7 @@ export function LineupGrid({
             >
               {stage.name || <em>Unnamed Stage</em>}
               {stage.stageType === 'simultaneous' && (
-                <span className="stage-type-badge">silent disco</span>
+                <span className="stage-type-badge">*</span>
               )}
             </div>
           ))}

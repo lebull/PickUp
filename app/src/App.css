@@ -2153,10 +2153,6 @@ input[type="time"] {
 }
 
 .results-dj-row--blank {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
   cursor: default;
   background: #161620;
   border-color: transparent;
@@ -2186,12 +2182,15 @@ input[type="time"] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .results-dj-contact {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .results-contact-email,
@@ -2211,6 +2210,8 @@ input[type="time"] {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .results-meta-genre,
@@ -2260,4 +2261,219 @@ input[type="time"] {
 .results-duplicate-telegram {
   color: #aaa;
   font-size: 0.82rem;
+}
+
+/* ── Results: contact row with copy button ── */
+
+.results-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.results-copy-email-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #555;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  font-size: 0.75rem;
+}
+
+.results-dj-row:hover .results-copy-email-btn {
+  opacity: 1;
+}
+
+.results-copy-email-btn:hover {
+  color: #bbb;
+  background: #333;
+}
+
+.results-copy-email-btn.copied {
+  color: #5cb85c;
+  opacity: 1;
+}
+
+.results-copy-email-btn:disabled {
+  cursor: not-allowed;
+  color: #3a3a3a;
+}
+
+/* ── Results: stage heading row (heading + copy button) ── */
+
+.results-stage-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.4rem;
+}
+
+.results-stage-heading-row .results-stage-heading {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin: 0;
+}
+
+.results-count-badge {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #666;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.results-copy-stage-btn {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: #666;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
+}
+
+.results-copy-stage-btn:hover {
+  color: #ccc;
+  border-color: #555;
+  background: #252525;
+}
+
+/* ── Results: total count summary ── */
+
+.results-total-count {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #bbb;
+}
+
+.results-count-note {
+  font-size: 0.78rem;
+  color: #555;
+}
+
+/* ── Results: email modal ── */
+
+.results-email-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.results-email-modal {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 1.25rem;
+  width: min(480px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.results-email-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.results-email-modal-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ddd;
+}
+
+.results-email-modal-close {
+  background: transparent;
+  border: none;
+  color: #777;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  transition: color 0.1s;
+}
+
+.results-email-modal-close:hover {
+  color: #ccc;
+}
+
+.results-email-modal-textarea {
+  width: 100%;
+  min-height: 110px;
+  background: #141414;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 0.82rem;
+  font-family: monospace;
+  padding: 0.6rem;
+  resize: vertical;
+  box-sizing: border-box;
+  line-height: 1.5;
+}
+
+.results-email-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.results-email-modal-copy-btn {
+  background: #2a4a7f;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.results-email-modal-copy-btn:hover:not(:disabled) {
+  background: #3a5a9f;
+}
+
+.results-email-modal-copy-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.results-email-modal-cancel-btn {
+  background: #2a2a2a;
+  color: #aaa;
+  border: 1px solid #3a3a3a;
+  border-radius: 5px;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.results-email-modal-cancel-btn:hover {
+  background: #333;
+  color: #ddd;
 }

@@ -4,14 +4,24 @@
  * for application alert and warning states.
  */
 export const STAGE_COLOR_PALETTE: string[] = [
+  '#fb923c', // orange
+  '#a16207', // gold
+  '#4ade80', // lime green
+  '#34d399', // mint
+  '#10b981', // emerald
+  '#14b8a6', // teal
+  '#06b6d4', // cyan
+  '#0ea5e9', // sky
+  '#38bdf8', // light blue
   '#6366f1', // indigo
   '#8b5cf6', // violet
-  '#0ea5e9', // sky
-  '#14b8a6', // teal
-  '#10b981', // emerald
-  '#ec4899', // pink
+  '#a78bfa', // lavender
+  '#c084fc', // mauve
   '#d946ef', // fuchsia
+  '#f472b6', // rose
+  '#ec4899', // pink
   '#64748b', // slate
+  '#94a3b8', // cool grey
 ]
 
 /**

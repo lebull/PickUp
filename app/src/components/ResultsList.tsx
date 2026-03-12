@@ -119,10 +119,36 @@ function buildResultsData(
     })
   }
 
-  return { acceptedByStage, rejectionList, duplicateAlerts, assignedNumbers }
+  // Per-stage DJ counts (blank slots excluded)
+  const djCountByStage = new Map<string, number>()
+  for (const { stageId, rows } of acceptedByStage) {
+    djCountByStage.set(stageId, rows.filter((r) => !('blankAssignment' in r)).length)
+  }
+  const totalDjCount = [...djCountByStage.values()].reduce((a, b) => a + b, 0)
+
+  return { acceptedByStage, rejectionList, duplicateAlerts, assignedNumbers, djCountByStage, totalDjCount }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function CopyIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
 
 interface DJRowItemProps {
   row: DJRow
@@ -132,6 +158,9 @@ interface DJRowItemProps {
 
 function DJRowItem({ row, isSelected, onClick }: DJRowItemProps) {
   const { submission: s } = row
+  const [emailCopied, setEmailCopied] = useState(false)
+  const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard
+
   return (
     <button
       className={`results-dj-row${isSelected ? ' selected' : ''}`}
@@ -140,7 +169,28 @@ function DJRowItem({ row, isSelected, onClick }: DJRowItemProps) {
     >
       <span className="results-dj-name">{s.djName}</span>
       <span className="results-dj-contact">
-        {s.contactEmail && <span className="results-contact-email">{s.contactEmail}</span>}
+        {s.contactEmail && (
+          <span className="results-contact-row">
+            <span className="results-contact-email">{s.contactEmail}</span>
+            <button
+              type="button"
+              className={`results-copy-email-btn${emailCopied ? ' copied' : ''}`}
+              title={canCopy ? 'Copy email address' : 'Clipboard not available'}
+              disabled={!canCopy}
+              aria-label="Copy email address"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!canCopy) return
+                navigator.clipboard.writeText(s.contactEmail).then(() => {
+                  setEmailCopied(true)
+                  setTimeout(() => setEmailCopied(false), 2000)
+                })
+              }}
+            >
+              {emailCopied ? '\u2713' : <CopyIcon />}
+            </button>
+          </span>
+        )}
         {s.telegramDiscord && (
           <span className="results-contact-telegram">{s.telegramDiscord}</span>
         )}
@@ -153,15 +203,83 @@ function DJRowItem({ row, isSelected, onClick }: DJRowItemProps) {
   )
 }
 
+interface EmailModalProps {
+  stageName: string
+  emails: string
+  onClose: () => void
+}
+
+function EmailModal({ stageName, emails, onClose }: EmailModalProps) {
+  const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard
+  const [copied, setCopied] = useState(false)
+
+  return (
+    <div
+      className="results-email-modal-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${stageName} emails`}
+    >
+      <div className="results-email-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="results-email-modal-header">
+          <h3 className="results-email-modal-title">{stageName} — Emails</h3>
+          <button
+            type="button"
+            className="results-email-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <textarea
+          className="results-email-modal-textarea"
+          readOnly
+          value={emails}
+          onFocus={(e) => e.target.select()}
+        />
+        <div className="results-email-modal-actions">
+          <button
+            type="button"
+            className="results-email-modal-copy-btn"
+            disabled={!canCopy || copied}
+            onClick={() => {
+              if (!canCopy) return
+              navigator.clipboard.writeText(emails).then(() => {
+                setCopied(true)
+                setTimeout(() => {
+                  setCopied(false)
+                  onClose()
+                }, 1200)
+              })
+            }}
+          >
+            {copied ? 'Copied!' : 'Copy to clipboard'}
+          </button>
+          <button
+            type="button"
+            className="results-email-modal-cancel-btn"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function ResultsList() {
   const { project, submissions } = useProjectContext()
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
+  const [emailModal, setEmailModal] = useState<{ stageName: string; emails: string } | null>(null)
 
   if (!submissions) return null
 
-  const { acceptedByStage, rejectionList, duplicateAlerts } =
+  const { acceptedByStage, rejectionList, duplicateAlerts, djCountByStage, totalDjCount } =
     buildResultsData(submissions, project)
 
   const hasSelection = selectedSubmission !== null
@@ -174,6 +292,15 @@ export function ResultsList() {
 
   function handleCloseDetail() {
     setSelectedSubmission(null)
+  }
+
+  function handleOpenEmailModal(stageName: string, rows: ResultRow[]) {
+    const emails = rows
+      .filter((r): r is DJRow => !('blankAssignment' in r))
+      .map((r) => r.submission.contactEmail)
+      .filter(Boolean)
+      .join(', ')
+    setEmailModal({ stageName, emails })
   }
 
   const listPane = (
@@ -210,28 +337,50 @@ export function ResultsList() {
           </p>
         </div>
       ) : (
-        acceptedByStage.map(({ stageId, stageName, rows }) => (
-          <section key={stageId} className="results-stage-section">
-            <h2 className="results-stage-heading">{stageName}</h2>
-            <div className="results-dj-list">
-              {rows.map((row, rowIdx) =>
-                'blankAssignment' in row ? (
-                  <div key={`blank-${rowIdx}`} className="results-dj-row results-dj-row--blank">
-                    <span className="results-dj-name">{getBlankLabel(row.blankAssignment)}</span>
-                    {row.slotTime && <span className="results-dj-slot-time">{row.slotTime}</span>}
-                  </div>
-                ) : (
-                  <DJRowItem
-                    key={row.submission.submissionNumber}
-                    row={row}
-                    isSelected={selectedSubmission?.submissionNumber === row.submission.submissionNumber}
-                    onClick={handleSelectDJ}
-                  />
-                )
-              )}
-            </div>
-          </section>
-        ))
+        <>
+          <div className="results-total-count">
+            <span>{totalDjCount} DJ{totalDjCount !== 1 ? 's' : ''} assigned across all stages</span>
+            <span className="results-count-note">Blocked/open slots are not included in these counts</span>
+          </div>
+          {acceptedByStage.map(({ stageId, stageName, rows }) => {
+            const djCount = djCountByStage.get(stageId) ?? 0
+            return (
+              <section key={stageId} className="results-stage-section">
+                <div className="results-stage-heading-row">
+                  <h2 className="results-stage-heading">
+                    {stageName}{' '}
+                    <span className="results-count-badge">({djCount} DJ{djCount !== 1 ? 's' : ''})</span>
+                  </h2>
+                  <button
+                    type="button"
+                    className="results-copy-stage-btn"
+                    onClick={() => handleOpenEmailModal(stageName, rows)}
+                  >
+                    Copy emails
+                  </button>
+                </div>
+                <div className="results-dj-list">
+                  {rows.map((row, rowIdx) =>
+                    'blankAssignment' in row ? (
+                      <div key={`blank-${rowIdx}`} className="results-dj-row results-dj-row--blank">
+                        <span className="results-dj-name">{getBlankLabel(row.blankAssignment)}</span>
+                        <span />
+                        <span className="results-dj-slot-time">{row.slotTime}</span>
+                      </div>
+                    ) : (
+                      <DJRowItem
+                        key={row.submission.submissionNumber}
+                        row={row}
+                        isSelected={selectedSubmission?.submissionNumber === row.submission.submissionNumber}
+                        onClick={handleSelectDJ}
+                      />
+                    )
+                  )}
+                </div>
+              </section>
+            )
+          })}
+        </>
       )}
 
       {/* Did Not Make the Cut */}
@@ -255,23 +404,30 @@ export function ResultsList() {
     </div>
   )
 
-  if (!hasSelection) {
-    return (
-      <div className="results-full-width">
-        {listPane}
-      </div>
-    )
-  }
-
   return (
-    <SplitPane initialSplit={45} minLeft={30} minRight={25}>
-      {listPane}
-      <div className="split-pane-detail-inner">
-        <SubmissionDetail
-          submission={selectedSubmission}
-          onBack={handleCloseDetail}
+    <>
+      {emailModal && (
+        <EmailModal
+          stageName={emailModal.stageName}
+          emails={emailModal.emails}
+          onClose={() => setEmailModal(null)}
         />
-      </div>
-    </SplitPane>
+      )}
+      {hasSelection ? (
+        <SplitPane initialSplit={45} minLeft={30} minRight={25}>
+          {listPane}
+          <div className="split-pane-detail-inner">
+            <SubmissionDetail
+              submission={selectedSubmission}
+              onBack={handleCloseDetail}
+            />
+          </div>
+        </SplitPane>
+      ) : (
+        <div className="results-full-width">
+          {listPane}
+        </div>
+      )}
+    </>
   )
 }
