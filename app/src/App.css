@@ -819,6 +819,19 @@
   background: #223a22;
 }
 
+.grid-slot--blank {
+  background: #1a1a24;
+  border: none;
+  color: #888;
+  font-style: italic;
+  width: 100%;
+  height: 100%;
+}
+
+.grid-slot--blank:hover {
+  background: #22222e;
+}
+
 .grid-slot--unconfigured {
   background: #181818;
   cursor: default;
@@ -1165,7 +1178,6 @@
   font-size: 0.6rem;
   color: #888;
   line-height: 1;
-}
 }
 
 .stage-field-row {
@@ -1971,6 +1983,45 @@ input[type="time"] {
   z-index: 1;
 }
 
+.dj-panel-blank-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #252535;
+  background: #141420;
+}
+
+.dj-panel-blank-label {
+  font-size: 0.75rem;
+  color: #888;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dj-panel-blank-input {
+  flex: 1;
+  background: #1e1e2e;
+  border: 1px solid #333;
+  color: #ccc;
+  border-radius: 3px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+  min-width: 0;
+}
+
+.dj-panel-blank-input:focus {
+  outline: none;
+  border-color: #4a5575;
+}
+
+.dj-panel-blank-hint {
+  font-size: 0.7rem;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Highlight active slot in grid */
 .grid-slot--active {
   outline: 2px solid #4a90d9 !important;
@@ -2099,6 +2150,33 @@ input[type="time"] {
 .results-dj-row.selected {
   background: #1a2a3a;
   border-color: #4a90d9;
+}
+
+.results-dj-row--blank {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: default;
+  background: #161620;
+  border-color: transparent;
+}
+
+.results-dj-row--blank:hover {
+  background: #1a1a28;
+  border-color: #333;
+}
+
+.results-dj-row--blank .results-dj-name {
+  color: #888;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.results-dj-slot-time {
+  font-size: 0.8rem;
+  color: #555;
+  white-space: nowrap;
 }
 
 .results-dj-name {

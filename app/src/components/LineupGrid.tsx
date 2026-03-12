@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
+import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
@@ -99,7 +100,7 @@ export function LineupGrid({
   function resolveSimultaneousDJs(stageId: string): { positionIndex: 1 | 2 | 3; djName: string }[] {
     return getSimultaneousAssignments(stageId).map((a) => ({
       positionIndex: a.positionIndex as 1 | 2 | 3,
-      djName: getDisplayName(a.submissionNumber),
+      djName: isBlankAssignment(a) ? getBlankLabel(a) : getDisplayName(a.submissionNumber),
     }))
   }
 
@@ -317,16 +318,19 @@ export function LineupGrid({
                   const assignment = getAssignment(stage.id, slotIndex)
                   const slotKey = `${stage.id}|${evening}|${slotIndex}`
                   const isActive = activeSlotKey === slotKey
-                  const assignedDjName = assignment
-                    ? getDisplayName(assignment.submissionNumber)
+                  const isBlank = assignment ? isBlankAssignment(assignment) : false
+                  const assignedLabel = assignment
+                    ? isBlankAssignment(assignment)
+                      ? getBlankLabel(assignment)
+                      : getDisplayName(assignment.submissionNumber)
                     : null
                   const stageColor = stageColorMap[stage.id]
                   return assignment ? (
                     <button
                       key={`${stage.id}-${timeLabel}`}
                       type="button"
-                      className={`grid-cell grid-slot grid-slot--occupied${isActive ? ' grid-slot--active' : ''}`}
-                      style={stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
+                      className={`grid-cell grid-slot ${isBlank ? 'grid-slot--blank' : 'grid-slot--occupied'}${isActive ? ' grid-slot--active' : ''}`}
+                      style={!isBlank && stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
                       onClick={() =>
                         onSlotClick({ stageId: stage.id, evening, slotIndex, timeLabel })
                       }
@@ -337,7 +341,7 @@ export function LineupGrid({
                         if (subNum) onAssign(stage.id, evening, slotIndex, subNum)
                       }}
                     >
-                      {assignedDjName}
+                      {assignedLabel}
                     </button>
                   ) : (
                     <button

@@ -1,14 +1,33 @@
 import { useState } from 'react'
 import { useProjectContext } from '../ProjectContext.ts'
-import type { Submission } from '../types.ts'
+import type { Submission, BlankSlotAssignment, Stage } from '../types.ts'
+import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
+import { getSlotLabels } from '../lineupUtils.ts'
 
 // ── Data helpers ─────────────────────────────────────────────────────────────
 
 interface DJRow {
   submission: Submission
   stageLabel?: string // for accepted rows
+}
+
+interface BlankRow {
+  blankAssignment: BlankSlotAssignment
+  slotTime: string
+}
+
+type ResultRow = DJRow | BlankRow
+
+function getSlotTimeLabel(assignment: BlankSlotAssignment, stage: Stage): string {
+  if (assignment.positionIndex != null) return `Position ${assignment.positionIndex}`
+  if (assignment.slotIndex != null) {
+    const labels = getSlotLabels(stage, assignment.evening)
+    const label = labels[assignment.slotIndex]
+    return label ? `${assignment.evening} · ${label}` : assignment.evening
+  }
+  return assignment.evening
 }
 
 interface DuplicateAlertEntry {
@@ -23,7 +42,12 @@ function buildResultsData(
 ) {
   const { assignments, stages, discardedSubmissions } = project
   const discardedSet = new Set(discardedSubmissions ?? [])
-  const assignedNumbers = new Set(assignments.map((a) => a.submissionNumber))
+
+  // Only DJ assignments count toward "assigned" submission numbers
+  const assignedNumbers = new Set<string>()
+  for (const a of assignments) {
+    if (!isBlankAssignment(a)) assignedNumbers.add(a.submissionNumber)
+  }
 
   // Build djName → Submission[] groups
   const djNameGroups = new Map<string, Submission[]>()
@@ -47,8 +71,8 @@ function buildResultsData(
     subByNumber.set(sub.submissionNumber, sub)
   }
 
-  // Accepted: per stage, collect assigned submissions in slot order
-  const acceptedByStage: Array<{ stageId: string; stageName: string; rows: DJRow[] }> = []
+  // Accepted: per stage, collect assigned submissions and blank slots in slot order
+  const acceptedByStage: Array<{ stageId: string; stageName: string; rows: ResultRow[] }> = []
   for (const stage of stages) {
     const stageAssignments = assignments
       .filter((a) => a.stageId === stage.id)
@@ -58,10 +82,14 @@ function buildResultsData(
         if (si !== 0) return si
         return (a.positionIndex ?? 0) - (b.positionIndex ?? 0)
       })
-    const rows: DJRow[] = []
+    const rows: ResultRow[] = []
     for (const assignment of stageAssignments) {
-      const sub = subByNumber.get(assignment.submissionNumber)
-      if (sub) rows.push({ submission: sub })
+      if (isBlankAssignment(assignment)) {
+        rows.push({ blankAssignment: assignment, slotTime: getSlotTimeLabel(assignment, stage) })
+      } else {
+        const sub = subByNumber.get(assignment.submissionNumber)
+        if (sub) rows.push({ submission: sub })
+      }
     }
     if (rows.length > 0) {
       acceptedByStage.push({ stageId: stage.id, stageName: stage.name, rows })
@@ -186,14 +214,21 @@ export function ResultsList() {
           <section key={stageId} className="results-stage-section">
             <h2 className="results-stage-heading">{stageName}</h2>
             <div className="results-dj-list">
-              {rows.map(({ submission: s }) => (
-                <DJRowItem
-                  key={s.submissionNumber}
-                  row={{ submission: s }}
-                  isSelected={selectedSubmission?.submissionNumber === s.submissionNumber}
-                  onClick={handleSelectDJ}
-                />
-              ))}
+              {rows.map((row, rowIdx) =>
+                'blankAssignment' in row ? (
+                  <div key={`blank-${rowIdx}`} className="results-dj-row results-dj-row--blank">
+                    <span className="results-dj-name">{getBlankLabel(row.blankAssignment)}</span>
+                    {row.slotTime && <span className="results-dj-slot-time">{row.slotTime}</span>}
+                  </div>
+                ) : (
+                  <DJRowItem
+                    key={row.submission.submissionNumber}
+                    row={row}
+                    isSelected={selectedSubmission?.submissionNumber === row.submission.submissionNumber}
+                    onClick={handleSelectDJ}
+                  />
+                )
+              )}
             </div>
           </section>
         ))

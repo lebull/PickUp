@@ -1,4 +1,5 @@
-import type { Submission, SlotAssignment } from '../types.ts'
+import type { Submission, SlotAssignment, DJSlotAssignment } from '../types.ts'
+import { isBlankAssignment } from '../types.ts'
 
 interface Props {
   submissions: Submission[]
@@ -12,7 +13,11 @@ interface Props {
 export function DJPool({ submissions, assignments, evening, pendingSlot, onAssign }: Props) {
   // All submission numbers assigned anywhere in the lineup (sequential slotIndex or simultaneous positionIndex).
   // This assignment-type-agnostic check correctly excludes DJs on silent disco stages too.
-  const assignedGlobally = new Set(assignments.map((a) => a.submissionNumber))
+  const assignedGlobally = new Set(
+    assignments
+      .filter((a): a is DJSlotAssignment => !isBlankAssignment(a))
+      .map((a) => a.submissionNumber)
+  )
 
   // DJs available on this evening and not yet assigned anywhere
   const pool = submissions.filter(

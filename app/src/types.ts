@@ -18,14 +18,33 @@ export interface Stage {
   color?: string
 }
 
-export interface SlotAssignment {
+interface SlotAssignmentBase {
   stageId: string
   evening: string
   /** Time-slot index for sequential stage assignments. Omitted for simultaneous assignments. */
   slotIndex?: number
   /** Position index (1–3) for simultaneous stage assignments. Omitted for sequential assignments. */
   positionIndex?: 1 | 2 | 3
+}
+
+export interface DJSlotAssignment extends SlotAssignmentBase {
+  type: 'dj'
   submissionNumber: string
+}
+
+export interface BlankSlotAssignment extends SlotAssignmentBase {
+  type: 'blank'
+  blankLabel?: string
+}
+
+export type SlotAssignment = DJSlotAssignment | BlankSlotAssignment
+
+export function isBlankAssignment(a: SlotAssignment): a is BlankSlotAssignment {
+  return a.type === 'blank'
+}
+
+export function getBlankLabel(a: BlankSlotAssignment): string {
+  return a.blankLabel || 'Blocked'
 }
 
 export interface LineupState {

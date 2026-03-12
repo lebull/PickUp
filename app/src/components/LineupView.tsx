@@ -88,7 +88,7 @@ export function LineupView() {
         ...prev.assignments.filter(
           (a) => !(a.stageId === stageId && a.evening === evening && a.slotIndex === slotIndex)
         ),
-        { stageId, evening, slotIndex, submissionNumber },
+        { type: 'dj', stageId, evening, slotIndex, submissionNumber },
       ]
       // Advance active slot to the next empty sequential slot on this evening
       if (activeSlot) {
@@ -141,7 +141,7 @@ export function LineupView() {
       if (!prevNextPos) return prev
       return {
         ...prev,
-        assignments: [...prev.assignments, { stageId, evening, positionIndex: prevNextPos, submissionNumber }],
+        assignments: [...prev.assignments, { type: 'dj', stageId, evening, positionIndex: prevNextPos, submissionNumber }],
       }
     })
 
@@ -161,6 +161,54 @@ export function LineupView() {
       )
       return { ...prev, assignments }
     })
+  }
+
+  function handleAssignBlank(stageId: string, evening: string, slotIndex: number, blankLabel?: string) {
+    setProject((prev) => {
+      if (!prev) return prev
+      const assignments: SlotAssignment[] = [
+        ...prev.assignments.filter(
+          (a) => !(a.stageId === stageId && a.evening === evening && a.slotIndex === slotIndex)
+        ),
+        { type: 'blank', stageId, evening, slotIndex, blankLabel: blankLabel || undefined },
+      ]
+      if (activeSlot) {
+        const nextSlot = findNextEmptySlot(prev.stages, assignments, evening, activeSlot)
+        if (nextSlot) setActiveSlot(nextSlot)
+      }
+      return { ...prev, assignments }
+    })
+  }
+
+  function handleAddBlankSimultaneous(stageId: string, evening: string, _positionIndex: 1 | 2 | 3, blankLabel?: string) {
+    const positions: (1 | 2 | 3)[] = [1, 2, 3]
+    const existing = project.assignments.filter(
+      (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+    )
+    if (existing.length >= 3) return
+    const usedSet = new Set(existing.map((a) => a.positionIndex as 1 | 2 | 3))
+    const nextPos = positions.find((p) => !usedSet.has(p))
+    if (!nextPos) return
+
+    setProject((prev) => {
+      if (!prev) return prev
+      const prevExisting = prev.assignments.filter(
+        (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+      )
+      if (prevExisting.length >= 3) return prev
+      const prevUsed = new Set(prevExisting.map((a) => a.positionIndex as 1 | 2 | 3))
+      const prevNextPos = positions.find((p) => !prevUsed.has(p))
+      if (!prevNextPos) return prev
+      return {
+        ...prev,
+        assignments: [...prev.assignments, { type: 'blank', stageId, evening, positionIndex: prevNextPos, blankLabel: blankLabel || undefined }],
+      }
+    })
+
+    const nextFreePos = positions.find((p) => !usedSet.has(p) && p !== nextPos)
+    if (nextFreePos && activeSlot) {
+      setActiveSlot({ ...activeSlot, positionIndex: nextFreePos })
+    }
   }
 
   function handleSaveStages(stages: Stage[]) {
@@ -231,6 +279,8 @@ export function LineupView() {
               onRemove={handleRemove}
               onAddSimultaneous={handleAddSimultaneous}
               onRemoveSimultaneous={handleRemoveSimultaneous}
+              onAssignBlank={handleAssignBlank}
+              onAddBlankSimultaneous={handleAddBlankSimultaneous}
               onPositionSelect={(pos) => setActiveSlot((prev) => prev ? { ...prev, positionIndex: pos } : prev)}
               onSelectSlot={(slotIndex, timeLabel) =>
                 setActiveSlot((prev) => prev ? { ...prev, slotIndex, timeLabel, positionIndex: undefined } : prev)

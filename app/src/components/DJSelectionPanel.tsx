@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Submission, Stage, SlotAssignment } from '../types.ts'
+import type { Submission, Stage, SlotAssignment, DJSlotAssignment } from '../types.ts'
+import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import { getSlotLabels } from '../lineupUtils.ts'
@@ -24,6 +25,8 @@ interface Props {
   onRemove: (stageId: string, evening: string, slotIndex: number) => void
   onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
   onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3) => void
+  onAssignBlank: (stageId: string, evening: string, slotIndex: number, blankLabel?: string) => void
+  onAddBlankSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, blankLabel?: string) => void
   onPositionSelect: (positionIndex: 1 | 2 | 3) => void
   /** Called when the user clicks a sequential slot row in the tray to change the active slot. */
   onSelectSlot: (slotIndex: number, timeLabel: string) => void
@@ -92,7 +95,7 @@ function SlotTray({
             (a) => a.slotIndex === slotIdx && a.positionIndex == null
           )
           const isActive = activeSlot.slotIndex === slotIdx
-          const rowStyle = stageColor && assignment ? { backgroundColor: hexToTint(stageColor, 0.15) } : undefined
+          const rowStyle = stageColor && assignment && !isBlankAssignment(assignment) ? { backgroundColor: hexToTint(stageColor, 0.15) } : undefined
           return (
             <div
               key={label}
@@ -109,8 +112,12 @@ function SlotTray({
               <span className="slot-tray-time">{label}</span>
               {assignment ? (
                 <>
-                  <span className="slot-tray-dj-name">{getDisplayName(assignment.submissionNumber)}</span>
-                  <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
+                  <span className="slot-tray-dj-name">
+                    {isBlankAssignment(assignment) ? getBlankLabel(assignment) : getDisplayName(assignment.submissionNumber)}
+                  </span>
+                  {!isBlankAssignment(assignment) && (
+                    <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
+                  )}
                   <button type="button" className="slot-tray-remove-btn" onClick={(e) => { e.stopPropagation(); onRemoveSequential(slotIdx) }}>
                     Remove
                   </button>
@@ -130,7 +137,7 @@ function SlotTray({
       {([1, 2, 3] as const).map((pos) => {
         const assignment = stageAssignments.find((a) => a.positionIndex === pos)
         const isActive = activeSlot.positionIndex === pos
-        const rowStyle = stageColor && assignment ? { backgroundColor: hexToTint(stageColor, 0.15) } : undefined
+        const rowStyle = stageColor && assignment && !isBlankAssignment(assignment) ? { backgroundColor: hexToTint(stageColor, 0.15) } : undefined
         return (
           <div
             key={pos}
@@ -147,8 +154,12 @@ function SlotTray({
             <span className="slot-tray-time">Pos {pos}</span>
             {assignment ? (
               <>
-                <span className="slot-tray-dj-name">{getDisplayName(assignment.submissionNumber)}</span>
-                <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
+                <span className="slot-tray-dj-name">
+                  {isBlankAssignment(assignment) ? getBlankLabel(assignment) : getDisplayName(assignment.submissionNumber)}
+                </span>
+                {!isBlankAssignment(assignment) && (
+                  <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
+                )}
                 <button
                   type="button"
                   className="slot-tray-remove-btn"
@@ -177,6 +188,8 @@ export function DJSelectionPanel({
   onRemove,
   onAddSimultaneous,
   onRemoveSimultaneous,
+  onAssignBlank,
+  onAddBlankSimultaneous,
   onPositionSelect,
   onSelectSlot,
   onClose,
@@ -216,13 +229,30 @@ export function DJSelectionPanel({
           a.slotIndex === activeSlot.slotIndex
       )
 
+  // Blank label input state — pre-fill from existing blank assignment when slot changes
+  const [blankLabel, setBlankLabel] = useState<string>('Blocked')
+  useEffect(() => {
+    if (!isSimultaneous && currentAssignment && isBlankAssignment(currentAssignment)) {
+      setBlankLabel(currentAssignment.blankLabel || 'Blocked')
+    } else {
+      setBlankLabel('Blocked')
+    }
+    // intentionally omit currentAssignment to only reset on slot navigation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex, isSimultaneous])
+
   // Submissions already assigned anywhere (by submissionNumber)
-  const assignedNumbers = useMemo(() => new Set(assignments.map((a) => a.submissionNumber)), [assignments])
+  const assignedNumbers = useMemo(() =>
+    new Set(
+      assignments
+        .filter((a): a is DJSlotAssignment => !isBlankAssignment(a))
+        .map((a) => a.submissionNumber)
+    ), [assignments])
 
   const available = useMemo(() => {
     return submissions.filter((s) => {
       // Exclude currently assigned submission (shown in header instead)
-      if (currentAssignment && s.submissionNumber === currentAssignment.submissionNumber) return false
+      if (currentAssignment && !isBlankAssignment(currentAssignment) && s.submissionNumber === currentAssignment.submissionNumber) return false
       // Exclude submissions assigned elsewhere
       if (assignedNumbers.has(s.submissionNumber)) return false
       // Exclude discarded submissions
@@ -274,6 +304,16 @@ export function DJSelectionPanel({
       onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, submissionNumber)
     }
     // Panel stays open — parent (LineupView) advances the active slot
+  }
+
+  function handleAssignBlank() {
+    const label = blankLabel.trim() || undefined
+    if (isSimultaneous) {
+      onAddBlankSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, label)
+    } else {
+      onAssignBlank(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, label)
+    }
+    onClose()
   }
 
   function djLabel(s: Submission): string {
@@ -400,6 +440,28 @@ export function DJSelectionPanel({
 
       {/* DJ list */}
       <div className="dj-panel-list">
+        {/* Pinned blank slot row — always first */}
+        <div
+          className="dj-panel-blank-row"
+          role="button"
+          tabIndex={0}
+          onClick={handleAssignBlank}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssignBlank() }}
+          aria-label="Assign as blocked slot"
+        >
+          <span className="dj-panel-blank-label">Blocked slot</span>
+          <input
+            type="text"
+            className="dj-panel-blank-input"
+            value={blankLabel}
+            onChange={(e) => setBlankLabel(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Blocked"
+            aria-label="Blank slot label"
+          />
+          <span className="dj-panel-blank-hint">click to assign</span>
+        </div>
         {sorted.length === 0 ? (
           <p className="dj-panel-empty">No available DJs for this slot.</p>
         ) : grouped ? (

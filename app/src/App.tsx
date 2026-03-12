@@ -54,7 +54,7 @@ function ProjectWorkspace() {
         const migrated = p.assignments
           .map((a) => {
             const aAny = a as unknown as Record<string, unknown>
-            if ('submissionNumber' in aAny) return a
+            if ('submissionNumber' in aAny || aAny.type === 'blank') return a
             const legacy = aAny as { djName: string } & Record<string, unknown>
             const match = subs!.find((s) => s.djName === legacy.djName)
             if (!match) {

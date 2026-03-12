@@ -1,5 +1,5 @@
 import { openDB } from 'idb'
-import type { Project } from './types'
+import type { Project, SlotAssignment } from './types'
 
 const DB_NAME = 'pickup-lineups'
 const STORE_NAME = 'projects'
@@ -53,6 +53,13 @@ function normalizeProject(project: Project): Project {
     // discardedSubmissions was added in the discard-submission change.
     // Legacy projects without the field default to an empty array.
     discardedSubmissions: project.discardedSubmissions ?? [],
+    // type was added in the blank-slot-assignment change.
+    // Legacy DJ assignments without the field default to type: 'dj'.
+    assignments: (project.assignments ?? []).map((a): SlotAssignment => {
+      const aAny = a as Record<string, unknown>
+      if (aAny.type === 'blank' || aAny.type === 'dj') return a as SlotAssignment
+      return { ...a, type: 'dj' } as SlotAssignment
+    }),
   }
 }
 
