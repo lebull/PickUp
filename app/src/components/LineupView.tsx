@@ -36,39 +36,35 @@ export function LineupView() {
     return <Navigate replace to={`/project/${project.id}/lineup/${target}`} />
   }
 
-  /** Returns the next empty sequential ActiveSlot on the given evening, or null if none. */
+  /** Returns the next empty sequential ActiveSlot within the same stage, or null if none. */
   function findNextEmptySlot(
     stages: Stage[],
     assignments: SlotAssignment[],
     evening: string,
     currentSlot: ActiveSlot
   ): ActiveSlot | null {
-    const sequentialStages = stages.filter(
-      (s) => s.activeDays.includes(evening) && (s.stageType ?? 'sequential') === 'sequential'
+    // Only scan within the same stage — never silently switch the active event
+    const stage = stages.find(
+      (s) => s.id === currentSlot.stageId && (s.stageType ?? 'sequential') === 'sequential'
     )
-    // Build an ordered list of all sequential slots for this evening
-    const allSlots: ActiveSlot[] = []
-    for (const stage of sequentialStages) {
-      const labels = getSlotLabels(stage, evening)
-      labels.forEach((timeLabel, slotIndex) => {
-        allSlots.push({ stageId: stage.id, evening, slotIndex, timeLabel })
-      })
-    }
-    // Find occupied slot indices
+    if (!stage) return null
+
+    const labels = getSlotLabels(stage, evening)
+    const allSlots: ActiveSlot[] = labels.map((timeLabel, slotIndex) => ({
+      stageId: stage.id, evening, slotIndex, timeLabel,
+    }))
+
     const occupied = new Set(
       assignments
-        .filter((a) => a.evening === evening && a.slotIndex != null)
-        .map((a) => `${a.stageId}|${a.slotIndex}`)
+        .filter((a) => a.stageId === currentSlot.stageId && a.evening === evening && a.slotIndex != null)
+        .map((a) => a.slotIndex as number)
     )
-    // Find index of current slot in the list
-    const currentIdx = allSlots.findIndex(
-      (s) => s.stageId === currentSlot.stageId && s.slotIndex === currentSlot.slotIndex
-    )
-    // Scan from next slot onward (wrapping), looking for first empty slot
+
+    const currentIdx = allSlots.findIndex((s) => s.slotIndex === currentSlot.slotIndex)
     const len = allSlots.length
     for (let i = 1; i < len; i++) {
       const candidate = allSlots[(currentIdx + i) % len]
-      if (!occupied.has(`${candidate.stageId}|${candidate.slotIndex}`)) {
+      if (!occupied.has(candidate.slotIndex!)) {
         return candidate
       }
     }
@@ -222,6 +218,7 @@ export function LineupView() {
   }
 
   function handleSelectEvening(evening: string) {
+    setActiveSlot(null)
     navigate(`/project/${project.id}/lineup/${evening.toLowerCase()}`)
   }
 
@@ -236,59 +233,8 @@ export function LineupView() {
           </button>
         </div>
       )}
-      <div className={`lineup-main${activeSlot ? ' lineup-main--has-panel' : ''}`}>
-        {activeSlot ? (
-          <SplitPane initialSplit={65} minLeft={35} minRight={20}>
-            <div
-              className="lineup-grid-wrapper"
-              onClick={(e) => {
-                if ((e.target as HTMLElement).classList.contains('lineup-grid-wrapper')) {
-                  setActiveSlot(null)
-                }
-              }}
-            >
-              <LineupGrid
-                submissions={submissions}
-                stages={project.stages}
-                assignments={project.assignments}
-                selectedEvening={selectedEvening}
-                onSelectEvening={handleSelectEvening}
-                onAssign={handleAssign}
-                onRemove={handleRemove}
-                onAddSimultaneous={handleAddSimultaneous}
-                onRemoveSimultaneous={handleRemoveSimultaneous}
-                onConfigureStages={() => setShowStageConfig(true)}
-                onSlotClick={setActiveSlot}
-                onSimultaneousClick={handleSimultaneousClick}
-                activeSlotKey={
-                  activeSlot
-                    ? activeSlot.positionIndex != null
-                      ? `${activeSlot.stageId}|${activeSlot.evening}|simultaneous`
-                      : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.slotIndex}`
-                    : null
-                }
-              />
-            </div>
-            <DJSelectionPanel
-              submissions={submissions}
-              stages={project.stages}
-              assignments={project.assignments}
-              discardedSubmissionNumbers={new Set(project.discardedSubmissions ?? [])}
-              activeSlot={activeSlot}
-              onAssign={handleAssign}
-              onRemove={handleRemove}
-              onAddSimultaneous={handleAddSimultaneous}
-              onRemoveSimultaneous={handleRemoveSimultaneous}
-              onAssignBlank={handleAssignBlank}
-              onAddBlankSimultaneous={handleAddBlankSimultaneous}
-              onPositionSelect={(pos) => setActiveSlot((prev) => prev ? { ...prev, positionIndex: pos } : prev)}
-              onSelectSlot={(slotIndex, timeLabel) =>
-                setActiveSlot((prev) => prev ? { ...prev, slotIndex, timeLabel, positionIndex: undefined } : prev)
-              }
-              onClose={() => setActiveSlot(null)}
-            />
-          </SplitPane>
-        ) : (
+      <div className="lineup-main">
+        <SplitPane initialSplit={65} minLeft={35} minRight={20}>
           <div
             className="lineup-grid-wrapper"
             onClick={(e) => {
@@ -310,10 +256,40 @@ export function LineupView() {
               onConfigureStages={() => setShowStageConfig(true)}
               onSlotClick={setActiveSlot}
               onSimultaneousClick={handleSimultaneousClick}
-              activeSlotKey={null}
+              activeSlotKey={
+                activeSlot
+                  ? activeSlot.positionIndex != null
+                    ? `${activeSlot.stageId}|${activeSlot.evening}|simultaneous`
+                    : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.slotIndex}`
+                  : null
+              }
             />
           </div>
-        )}
+          {activeSlot ? (
+            <DJSelectionPanel
+              submissions={submissions}
+              stages={project.stages}
+              assignments={project.assignments}
+              discardedSubmissionNumbers={new Set(project.discardedSubmissions ?? [])}
+              activeSlot={activeSlot}
+              onAssign={handleAssign}
+              onRemove={handleRemove}
+              onAddSimultaneous={handleAddSimultaneous}
+              onRemoveSimultaneous={handleRemoveSimultaneous}
+              onAssignBlank={handleAssignBlank}
+              onAddBlankSimultaneous={handleAddBlankSimultaneous}
+              onPositionSelect={(pos) => setActiveSlot((prev) => prev ? { ...prev, positionIndex: pos } : prev)}
+              onSelectSlot={(slotIndex, timeLabel) =>
+                setActiveSlot((prev) => prev ? { ...prev, slotIndex, timeLabel, positionIndex: undefined } : prev)
+              }
+              onClose={() => setActiveSlot(null)}
+            />
+          ) : (
+            <div className="lineup-empty-state">
+              <p>Drag and drop a DJ to a slot, or click a slot to get started</p>
+            </div>
+          )}
+        </SplitPane>
       </div>
       {showStageConfig && (
         <StageConfigPanel

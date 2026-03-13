@@ -671,6 +671,25 @@
   overflow-y: auto;
 }
 
+/* ── Lineup empty state (right pane when no slot selected) ── */
+.lineup-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  color: #444;
+  font-size: 0.9rem;
+  text-align: center;
+  background: #111;
+  border-left: 1px solid #222;
+}
+
+.lineup-empty-state p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 
 /* ── Mismatch banner ─────────────────────────────────────── */
 .mismatch-banner {
@@ -1981,6 +2000,59 @@ input[type="time"] {
   padding: 1.5rem 1rem;
   margin: 0;
 }
+
+/* ── Score peek tooltip ─────────────────────────────────── */
+.score-peek-tooltip {
+  background: #1e1e2e;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  z-index: 9999;
+  min-width: 180px;
+  max-width: 300px;
+  font-size: 0.75rem;
+  color: #ccc;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  line-height: 1.5;
+}
+
+.score-peek-judge + .score-peek-judge {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #2e2e2e;
+}
+
+.score-peek-subscores {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.score-peek-judge-label {
+  font-weight: 600;
+  color: #7ab8f5;
+  min-width: 1.6em;
+}
+
+.score-peek-item {
+  white-space: nowrap;
+}
+
+.score-peek-dim {
+  color: #555;
+  font-size: 0.7rem;
+  margin-right: 0.1rem;
+}
+
+.score-peek-notes {
+  color: #888;
+  font-size: 0.72rem;
+  margin-top: 0.2rem;
+  white-space: pre-wrap;
+  max-width: 280px;
+}
+
 
 .dj-panel-group {
   display: contents;

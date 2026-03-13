@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Submission, Stage, SlotAssignment, DJSlotAssignment } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
@@ -222,6 +222,8 @@ export function DJSelectionPanel({
     return [...seen].sort()
   }, [submissions])
 
+  const [scorePeek, setScorePeek] = useState<{ sub: Submission; rect: DOMRect } | null>(null)
+
   // Reset focus stage only when the evening changes (inline state reset per React docs)
   const [lastEvening, setLastEvening] = useState(activeSlot.evening)
   if (activeSlot.evening !== lastEvening) {
@@ -312,7 +314,43 @@ export function DJSelectionPanel({
     return s.djName
   }
 
+  function renderPeekContent(sub: Submission): ReactNode {
+    if (useMoonlight) {
+      return (
+        <>
+          <div className="score-peek-subscores">
+            <span className="score-peek-item"><span className="score-peek-dim">Tech</span> {sub.mlTechnical ?? '—'}</span>
+            <span className="score-peek-item"><span className="score-peek-dim">Flow</span> {sub.mlFlow ?? '—'}</span>
+            <span className="score-peek-item"><span className="score-peek-dim">Ent</span> {sub.mlEntertainment ?? '—'}</span>
+          </div>
+          {sub.mlNotes && <div className="score-peek-notes">{sub.mlNotes}</div>}
+        </>
+      )
+    }
+    const judges = [
+      { label: 'J1', tech: sub.j1Technical, flow: sub.j1Flow, ent: sub.j1Entertainment, notes: sub.j1Notes },
+      { label: 'J2', tech: sub.j2Technical, flow: sub.j2Flow, ent: sub.j2Entertainment, notes: sub.j2Notes },
+      { label: 'J3', tech: sub.j3Technical, flow: sub.j3Flow, ent: sub.j3Entertainment, notes: sub.j3Notes },
+    ].filter((j) => j.tech !== null || j.flow !== null || j.ent !== null)
+    if (judges.length === 0) return null
+    return (
+      <>{judges.map((j) => (
+        <div key={j.label} className="score-peek-judge">
+          <div className="score-peek-subscores">
+            <span className="score-peek-judge-label">{j.label}</span>
+            <span className="score-peek-item"><span className="score-peek-dim">T</span> {j.tech ?? '—'}</span>
+            <span className="score-peek-item"><span className="score-peek-dim">F</span> {j.flow ?? '—'}</span>
+            <span className="score-peek-item"><span className="score-peek-dim">E</span> {j.ent ?? '—'}</span>
+          </div>
+          {j.notes && <div className="score-peek-notes">{j.notes}</div>}
+        </div>
+      ))}</>
+    )
+  }
+
   function renderCard(s: Submission) {
+    const scoreVal = useMoonlight ? s.mlScore.avg : s.mainScore.avg
+    const hasPeek = scoreVal !== null
     return (
       <div
         key={s.submissionNumber}
@@ -329,8 +367,14 @@ export function DJSelectionPanel({
         aria-label={`Assign ${djLabel(s)}`}
       >
         <span className="dj-col-name" title={djLabel(s)}>{djLabel(s)}</span>
-        <span className="dj-col-score dj-col-main-score" title={fmt(s.mainScore.avg)}>{fmt(s.mainScore.avg)}</span>
-        <span className="dj-col-score dj-col-ml-score" title={fmt(s.mlScore.avg)}>{fmt(s.mlScore.avg)}</span>
+        <span
+          className="dj-col-score"
+          title={fmt(scoreVal)}
+          onMouseEnter={hasPeek ? (e) => { e.stopPropagation(); setScorePeek({ sub: s, rect: e.currentTarget.getBoundingClientRect() }) } : undefined}
+          onMouseLeave={hasPeek ? () => setScorePeek(null) : undefined}
+        >
+          {fmt(scoreVal)}
+        </span>
         <span className="dj-col-genre" title={s.genre || '—'}>{s.genre || '—'}</span>
         <span className="dj-col-format" title={s.formatGear || '—'}>{s.formatGear || '—'}</span>
         {useMoonlight && (
@@ -419,8 +463,7 @@ export function DJSelectionPanel({
       {/* Column headers */}
       <div className="dj-panel-list-header">
         <span className="dj-col-name">DJ</span>
-        <span className="dj-col-score dj-col-main-score">Main</span>
-        <span className="dj-col-score dj-col-ml-score">ML</span>
+        <span className="dj-col-score">{useMoonlight ? 'ML' : 'Score'}</span>
         <span className="dj-col-genre">Genre</span>
         <span className="dj-col-format">Format / Gear</span>
         {useMoonlight && <span className="dj-col-vibefit">Vibefit</span>}
@@ -446,6 +489,18 @@ export function DJSelectionPanel({
         )}
       </div>
       </div>
+      {scorePeek && (
+        <div
+          className="score-peek-tooltip"
+          style={{
+            position: 'fixed',
+            bottom: `${window.innerHeight - scorePeek.rect.top + 6}px`,
+            right: `${window.innerWidth - scorePeek.rect.right}px`,
+          }}
+        >
+          {renderPeekContent(scorePeek.sub)}
+        </div>
+      )}
     </div>
   )
 }
