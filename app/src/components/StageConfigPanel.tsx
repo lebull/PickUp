@@ -203,6 +203,14 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                       {(stage.stageType ?? 'sequential') === 'simultaneous' && (
                         <span className="simultaneous-note">Up to 3 DJs play simultaneously</span>
                       )}
+                      <label className="stage-field-label stage-moonlight-label">
+                        <input
+                          type="checkbox"
+                          checked={stage.useMoonlightScores ?? false}
+                          onChange={(e) => updateStage(stage.id, { useMoonlightScores: e.target.checked })}
+                        />
+                        {' '}Use Moonlight Scores
+                      </label>
                       <button
                         type="button"
                         className="btn-danger btn-small"

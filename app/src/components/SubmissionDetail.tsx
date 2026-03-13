@@ -17,46 +17,28 @@ function rawScore(n: number | null): string {
 
 interface SummaryProps {
   submission: Submission
-  appContext: 'standard' | 'moonlight'
   anonymousLabel: string
 }
 
-function SubmissionSummary({ submission: s, appContext, anonymousLabel: _anonymousLabel }: SummaryProps) {
+function SubmissionSummary({ submission: s, anonymousLabel: _anonymousLabel }: SummaryProps) {
   const mlScore = s.moonlightInterest && s.mlScore.avg !== null
     ? s.mlScore.avg.toFixed(2)
     : '—'
-  const primaryItem = appContext === 'moonlight' ? (
-    <>
-      <div className="detail-summary-item detail-summary-item--primary">
-        <span className="detail-summary-label">ML Score</span>
-        <span className="detail-summary-value">{mlScore}</span>
-      </div>
-      <div className="detail-summary-item">
-        <span className="detail-summary-label">Main Score</span>
-        <span className="detail-summary-value">
-          {numVal(s.mainScore.avg)}
-          {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored"> *</span>}
-        </span>
-      </div>
-    </>
-  ) : (
-    <>
-      <div className="detail-summary-item detail-summary-item--primary">
-        <span className="detail-summary-label">Main Score</span>
-        <span className="detail-summary-value">
-          {numVal(s.mainScore.avg)}
-          {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored"> *</span>}
-        </span>
-      </div>
-      <div className="detail-summary-item">
-        <span className="detail-summary-label">ML Score</span>
-        <span className="detail-summary-value">{mlScore}</span>
-      </div>
-    </>
-  )
   return (
     <div className="detail-summary">
-      {primaryItem}
+      <>
+        <div className="detail-summary-item detail-summary-item--primary">
+          <span className="detail-summary-label">Main Score</span>
+          <span className="detail-summary-value">
+            {numVal(s.mainScore.avg)}
+            {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored"> *</span>}
+          </span>
+        </div>
+        <div className="detail-summary-item">
+          <span className="detail-summary-label">ML Score</span>
+          <span className="detail-summary-value">{mlScore}</span>
+        </div>
+      </>
       <div className="detail-summary-item">
         <span className="detail-summary-label">Genre</span>
         <span className="detail-summary-value">{val(s.genre)}</span>
@@ -99,7 +81,7 @@ interface Props {
 }
 
 export function SubmissionDetail({ submission: s, onBack }: Props) {
-  const { appContext, hiddenNames } = useAppPreferences()
+  const { hiddenNames } = useAppPreferences()
   const { project, toggleDiscardSubmission } = useProjectContext()
   const isDiscarded = (project.discardedSubmissions ?? []).includes(s.submissionNumber)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -208,7 +190,7 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
 
       <h1 className="detail-title">{displayName}</h1>
 
-      <SubmissionSummary submission={s} appContext={appContext} anonymousLabel={anonymousLabel} />
+      <SubmissionSummary submission={s} anonymousLabel={anonymousLabel} />
 
       <Section title="Basic Info">
         <Field label="DJ Name" value={hiddenNames ? anonymousLabel : val(s.djName)} />

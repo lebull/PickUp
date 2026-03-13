@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange } from '../lineupUtils.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 
@@ -38,7 +38,7 @@ export function LineupGrid({
   onSimultaneousClick,
   activeSlotKey,
 }: Props) {
-  const { hiddenNames } = useAppPreferences()
+  const { hiddenNames, timeFormat } = useAppPreferences()
 
   function getDisplayName(submissionNumber: string): string {
     const idx = submissions.findIndex((s) => s.submissionNumber === submissionNumber)
@@ -238,7 +238,7 @@ export function LineupGrid({
             timeAxis.map((timeLabel, rowIndex) => (
               <>
                 <div key={`time-${timeLabel}`} className="grid-cell grid-time-label">
-                  {timeLabel}
+                  {formatTimeLabel(timeLabel, timeFormat)}
                 </div>
                 {eveningStages.map((stage, stageIndex) => {
                   // Simultaneous stages use explicit grid placement to span their time range.

@@ -1,24 +1,24 @@
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 
 export function AppPreferencesControls() {
-  const { appContext, setAppContext, hiddenNames, setHiddenNames } = useAppPreferences()
+  const { timeFormat, setTimeFormat, hiddenNames, setHiddenNames } = useAppPreferences()
 
   return (
     <div className="app-prefs-controls">
-      <div className="context-toggle" role="group" aria-label="App context">
+      <div className="context-toggle" role="group" aria-label="Time format">
         <button
           type="button"
-          className={`context-btn${appContext === 'standard' ? ' active' : ''}`}
-          onClick={() => setAppContext('standard')}
+          className={`context-btn${timeFormat === '24h' ? ' active' : ''}`}
+          onClick={() => setTimeFormat('24h')}
         >
-          Standard
+          24h
         </button>
         <button
           type="button"
-          className={`context-btn${appContext === 'moonlight' ? ' active' : ''}`}
-          onClick={() => setAppContext('moonlight')}
+          className={`context-btn${timeFormat === '12h' ? ' active' : ''}`}
+          onClick={() => setTimeFormat('12h')}
         >
-          🌙 Moonlight
+          12h
         </button>
       </div>
       <button

@@ -16,6 +16,8 @@ export interface Stage {
   slotDuration: number // minutes (sequential stages only)
   /** Optional display color as a hex string (e.g. "#6366f1"). Chosen from the curated stage color palette. */
   color?: string
+  /** When true, this stage uses ML scores for sorting and Moonlight-interest filtering in the DJ selection panel. */
+  useMoonlightScores?: boolean
 }
 
 interface SlotAssignmentBase {

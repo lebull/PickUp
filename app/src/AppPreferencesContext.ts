@@ -1,10 +1,10 @@
 import { createContext, useContext, useState } from 'react'
 
-export type AppContextMode = 'standard' | 'moonlight'
+export type TimeFormat = '12h' | '24h'
 
 export interface AppPreferencesContextValue {
-  appContext: AppContextMode
-  setAppContext: (ctx: AppContextMode) => void
+  timeFormat: TimeFormat
+  setTimeFormat: (fmt: TimeFormat) => void
   hiddenNames: boolean
   setHiddenNames: (v: boolean) => void
 }
@@ -20,7 +20,7 @@ export function useAppPreferences(): AppPreferencesContextValue {
 const PREFS_KEY = 'pickup_prefs_v1'
 
 interface StoredPrefs {
-  appContext: AppContextMode
+  timeFormat: TimeFormat
   hiddenNames: boolean
 }
 
@@ -30,14 +30,14 @@ function loadPrefs(): StoredPrefs {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<StoredPrefs>
       return {
-        appContext: parsed.appContext === 'moonlight' ? 'moonlight' : 'standard',
+        timeFormat: parsed.timeFormat === '12h' ? '12h' : '24h',
         hiddenNames: typeof parsed.hiddenNames === 'boolean' ? parsed.hiddenNames : false,
       }
     }
   } catch {
     // ignore parse errors
   }
-  return { appContext: 'standard', hiddenNames: false }
+  return { timeFormat: '24h', hiddenNames: false }
 }
 
 function savePrefs(prefs: StoredPrefs): void {
@@ -49,18 +49,18 @@ function savePrefs(prefs: StoredPrefs): void {
 }
 
 export function useAppPreferencesState(): AppPreferencesContextValue {
-  const [appContext, setAppContextState] = useState<AppContextMode>(() => loadPrefs().appContext)
+  const [timeFormat, setTimeFormatState] = useState<TimeFormat>(() => loadPrefs().timeFormat)
   const [hiddenNames, setHiddenNamesState] = useState<boolean>(() => loadPrefs().hiddenNames)
 
-  function setAppContext(ctx: AppContextMode) {
-    setAppContextState(ctx)
-    savePrefs({ appContext: ctx, hiddenNames })
+  function setTimeFormat(fmt: TimeFormat) {
+    setTimeFormatState(fmt)
+    savePrefs({ timeFormat: fmt, hiddenNames })
   }
 
   function setHiddenNames(v: boolean) {
     setHiddenNamesState(v)
-    savePrefs({ appContext, hiddenNames: v })
+    savePrefs({ timeFormat, hiddenNames: v })
   }
 
-  return { appContext, setAppContext, hiddenNames, setHiddenNames }
+  return { timeFormat, setTimeFormat, hiddenNames, setHiddenNames }
 }

@@ -31,7 +31,7 @@ export function SubmissionsView() {
   const { id: projectId, djIndex } = useParams<{ id: string; djIndex: string }>()
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
-  const { appContext, hiddenNames } = useAppPreferences()
+  const { hiddenNames } = useAppPreferences()
 
   const [sortField, setSortField] = useState<SortField>('number')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -40,21 +40,12 @@ export function SubmissionsView() {
   const [showStageAssignments, setShowStageAssignments] = useState(false)
   const [cursorIndex, setCursorIndex] = useState<number | null>(null)
 
-  // Reset sort and search when appContext changes (inline state reset per React docs)
-  const [lastContext, setLastContext] = useState(appContext)
-  if (appContext !== lastContext) {
-    setLastContext(appContext)
-    setSortField('number')
-    setSortDir('asc')
-    setNameSearch('')
-  }
-
   if (submissions === null) return null
 
   const hasSelection = djIndex !== undefined
 
   // Derive lineup submission numbers from project assignments
-  const lineupSubmissionNumbers = new Set(project.assignments.map((a) => a.submissionNumber))
+  const lineupSubmissionNumbers = new Set(project.assignments.filter((a) => a.type === 'dj').map((a) => a.submissionNumber))
   const discardedSubmissionNumbers = new Set(project.discardedSubmissions ?? [])
 
   function handleHeaderClick(field: SortField) {
@@ -92,7 +83,6 @@ export function SubmissionsView() {
           lineupSubmissionNumbers={lineupSubmissionNumbers}
           discardedSubmissionNumbers={discardedSubmissionNumbers}
           hiddenNames={hiddenNames}
-          appContext={appContext}
           onHeaderClick={handleHeaderClick}
           onMetricChange={setScoreMetric}
           onNameSearchChange={setNameSearch}

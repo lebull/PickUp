@@ -14,7 +14,7 @@ describe('AppPreferencesContext', () => {
     }).toThrow('useAppPreferences must be used inside AppPreferencesProvider')
   })
 
-  it('defaults to appContext "standard" and hiddenNames false', () => {
+  it('defaults to timeFormat "24h" and hiddenNames false', () => {
     const Wrapper = ({ children }: { children: React.ReactNode }) => {
       const prefs = useAppPreferencesState()
       return (
@@ -24,11 +24,11 @@ describe('AppPreferencesContext', () => {
       )
     }
     const { result } = renderHook(() => useAppPreferences(), { wrapper: Wrapper })
-    expect(result.current.appContext).toBe('standard')
+    expect(result.current.timeFormat).toBe('24h')
     expect(result.current.hiddenNames).toBe(false)
   })
 
-  it('updates appContext when setter is called', () => {
+  it('updates timeFormat when setter is called', () => {
     const Wrapper = ({ children }: { children: React.ReactNode }) => {
       const prefs = useAppPreferencesState()
       return (
@@ -38,8 +38,10 @@ describe('AppPreferencesContext', () => {
       )
     }
     const { result } = renderHook(() => useAppPreferences(), { wrapper: Wrapper })
-    act(() => result.current.setAppContext('moonlight'))
-    expect(result.current.appContext).toBe('moonlight')
+    act(() => result.current.setTimeFormat('12h'))
+    expect(result.current.timeFormat).toBe('12h')
+    act(() => result.current.setTimeFormat('24h'))
+    expect(result.current.timeFormat).toBe('24h')
   })
 
   it('updates hiddenNames when setter is called', () => {

@@ -13,7 +13,7 @@ interface Props {
 export function NavActionsMenu({ project, onImport }: Props) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const { appContext, setAppContext, hiddenNames, setHiddenNames } = useAppPreferences()
+  const { hiddenNames, setHiddenNames, timeFormat, setTimeFormat } = useAppPreferences()
 
   useEffect(() => {
     if (!open) return
@@ -50,21 +50,21 @@ export function NavActionsMenu({ project, onImport }: Props) {
       {open && (
         <div className="nav-actions-dropdown">
           <div className="nav-actions-row">
-            <span className="nav-actions-label">Context</span>
-            <div className="context-toggle" role="group" aria-label="App context">
+            <span className="nav-actions-label">Time</span>
+            <div className="context-toggle" role="group" aria-label="Time format">
               <button
                 type="button"
-                className={`context-btn${appContext === 'standard' ? ' active' : ''}`}
-                onClick={() => setAppContext('standard')}
+                className={`context-btn${timeFormat === '24h' ? ' active' : ''}`}
+                onClick={() => setTimeFormat('24h')}
               >
-                Standard
+                24h
               </button>
               <button
                 type="button"
-                className={`context-btn${appContext === 'moonlight' ? ' active' : ''}`}
-                onClick={() => setAppContext('moonlight')}
+                className={`context-btn${timeFormat === '12h' ? ' active' : ''}`}
+                onClick={() => setTimeFormat('12h')}
               >
-                🌙 Moonlight
+                12h
               </button>
             </div>
           </div>

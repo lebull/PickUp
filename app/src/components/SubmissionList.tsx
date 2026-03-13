@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import type { RefObject } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
-import type { AppContextMode } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 
 export type SortField = 'main' | 'ml' | 'number' | null
@@ -56,7 +55,6 @@ interface Props {
   lineupSubmissionNumbers: Set<string>
   discardedSubmissionNumbers: Set<string>
   hiddenNames: boolean
-  appContext: AppContextMode
   listRef: RefObject<HTMLDivElement | null>
   onHeaderClick: (field: SortField) => void
   onMetricChange: (metric: ScoreMetric) => void
@@ -79,7 +77,6 @@ export function SubmissionList({
   lineupSubmissionNumbers,
   discardedSubmissionNumbers,
   hiddenNames,
-  appContext,
   listRef,
   onHeaderClick,
   onMetricChange,
@@ -142,6 +139,7 @@ export function SubmissionList({
     const stageById = new Map(stages.map((s) => [s.id, s]))
     const map = new Map<string, { color: string | undefined; name: string | undefined }>()
     for (const a of assignments) {
+      if (a.type !== 'dj') continue
       if (!map.has(a.submissionNumber)) {
         const stage = stageById.get(a.stageId)
         map.set(a.submissionNumber, { color: stage?.color, name: stage?.name })
@@ -244,7 +242,7 @@ export function SubmissionList({
               <th>Genre</th>
               <th>Preferred Stages</th>
               <th>Days Available</th>
-              {appContext === 'moonlight' && <th>Vibefit</th>}
+              <th>Vibefit</th>
             </tr>
           </thead>
           <tbody>
@@ -300,7 +298,7 @@ export function SubmissionList({
                   <td>{s.genre || '—'}</td>
                   <td>{s.stagePreferences.join(', ') || '—'}</td>
                   <td>{s.daysAvailable || '—'}</td>
-                  {appContext === 'moonlight' && <td>{s.mlVibefit || '—'}</td>}
+                  <td>{s.mlVibefit || '—'}</td>
                 </tr>
               )
             })}

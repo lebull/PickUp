@@ -1,4 +1,5 @@
 import type { Stage } from './types.ts'
+import type { TimeFormat } from './AppPreferencesContext.ts'
 
 /** Convention days in display order. */
 export const CONVENTION_DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday'] as const
@@ -6,6 +7,19 @@ export const CONVENTION_DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday'] as c
 export function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
+}
+
+/**
+ * Formats a "HH:MM" 24-hour time string for display.
+ * In '12h' mode returns "h:MM am/pm" (e.g. "8:00 pm", "12:00 am").
+ * In '24h' mode returns the string unchanged.
+ */
+export function formatTimeLabel(hhmm: string, format: TimeFormat): string {
+  if (format === '24h') return hhmm
+  const [h, m] = hhmm.split(':').map(Number)
+  const suffix = h < 12 ? 'am' : 'pm'
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  return `${hour12}:${String(m).padStart(2, '0')} ${suffix}`
 }
 
 function minutesToTime(totalMinutes: number): string {
@@ -51,31 +65,67 @@ export function getSlotLabels(stage: Stage, evening: string): string[] {
 
 /**
  * Returns the unified, chronologically sorted time axis for an evening.
- * Formed by the union of slot labels from all active stages on that evening.
-/**
- * Returns the unified, chronologically sorted time axis for an evening.
- * Formed by the union of slot labels from all sequential stages on that evening,
- * plus the startTime of any simultaneous stages (so the grid has a row at the
- * point where simultaneous stages begin, even if no sequential stage starts then).
- * Times in the early morning (before 06:00) are treated as "next day" for sort order.
+ * Spans from the earliest start time to the latest end time across all active
+ * sequential stages on that evening, stepping by the minimum slotDuration.
+ * This produces a continuous axis — stages with no slot at a given time will
+ * render empty cells (gap rows) rather than the axis collapsing.
+ * Simultaneous stages contribute no rows to the axis.
+ * Times before 06:00 are treated as "next day" for sort order.
  */
 export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
-  const timeSet = new Set<string>()
-  for (const stage of stages) {
-    if (stage.stageType === 'simultaneous') {
-      // Add the simultaneous stage's start time so the grid can anchor the cell
-      // at the correct position even when no sequential stage has a slot that early.
-      const startTime = stage.schedule?.[evening]?.startTime
-      if (startTime) timeSet.add(startTime)
-    } else {
-      for (const label of getSlotLabels(stage, evening)) {
-        timeSet.add(label)
-      }
-    }
-  }
-  return [...timeSet].sort((a, b) =>
-    toSortableMinutes(timeToMinutes(a)) - toSortableMinutes(timeToMinutes(b))
+  const sequentialStages = stages.filter(
+    (s) => s.stageType !== 'simultaneous' && s.activeDays.includes(evening)
   )
+  if (sequentialStages.length === 0) return []
+
+  let earliestStart = Infinity
+  let latestEnd = -Infinity
+  let minDuration = Infinity
+
+  for (const stage of sequentialStages) {
+    const daySchedule = stage.schedule?.[evening]
+    if (!daySchedule?.startTime || !daySchedule?.endTime || !stage.slotDuration) continue
+
+    const startM = timeToMinutes(daySchedule.startTime)
+    let endM = timeToMinutes(daySchedule.endTime)
+    if (endM <= startM) endM += 24 * 60
+
+    const startSortable = toSortableMinutes(startM)
+    const endSortable = startSortable + (endM - startM)
+
+    if (startSortable < earliestStart) earliestStart = startSortable
+    if (endSortable > latestEnd) latestEnd = endSortable
+    if (stage.slotDuration < minDuration) minDuration = stage.slotDuration
+  }
+
+  // Expand axis bounds to cover simultaneous stages so getSimultaneousRowRange can map
+  // their start/end times onto the correct grid rows even when they fall outside the
+  // sequential stage range (e.g. a silent disco running 1pm–3pm before DJs start at 3pm).
+  for (const stage of stages) {
+    if (stage.stageType !== 'simultaneous' || !stage.activeDays.includes(evening)) continue
+    const daySchedule = stage.schedule?.[evening]
+    if (!daySchedule?.startTime || !daySchedule?.endTime) continue
+
+    const startM = timeToMinutes(daySchedule.startTime)
+    let endM = timeToMinutes(daySchedule.endTime)
+    if (endM <= startM) endM += 24 * 60
+
+    const startSortable = toSortableMinutes(startM)
+    const endSortable = startSortable + (endM - startM)
+
+    if (startSortable < earliestStart) earliestStart = startSortable
+    if (endSortable > latestEnd) latestEnd = endSortable
+  }
+
+  if (!isFinite(earliestStart) || !isFinite(latestEnd) || !isFinite(minDuration)) return []
+
+  const labels: string[] = []
+  for (let t = earliestStart; t < latestEnd; t += minDuration) {
+    // Convert back from sortable minutes to actual HH:MM
+    const actualMinutes = t >= 24 * 60 ? t - 24 * 60 : t
+    labels.push(minutesToTime(actualMinutes))
+  }
+  return labels
 }
 
 /**
