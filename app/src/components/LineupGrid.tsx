@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import type { Submission, Stage, SlotAssignment } from '../types.ts'
+import { useMemo, useState } from 'react'
+import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventSlots } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
@@ -15,6 +15,7 @@ interface Props {
   onRemove: (stageId: string, evening: string, slotIndex: number, eventIndex: number) => void
   onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string, eventIndex: number) => void
   onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, eventIndex: number) => void
+  onMoveAssignment: (from: SlotCoord, to: SlotCoord) => void
   onConfigureStages: () => void
   /** Called when a sequential slot cell is clicked; parent owns the active slot state. */
   onSlotClick: (slot: { stageId: string; evening: string; slotIndex: number; eventIndex: number; timeLabel: string }) => void
@@ -30,15 +31,17 @@ export function LineupGrid({
   selectedEvening,
   onSelectEvening,
   onAssign,
-  onRemove: _onRemove,
+  onRemove,
   onAddSimultaneous,
   onRemoveSimultaneous,
+  onMoveAssignment,
   onConfigureStages,
   onSlotClick,
   onSimultaneousClick,
   activeSlotKey,
 }: Props) {
   const { hiddenNames, timeFormat } = useAppPreferences()
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
 
   function getDisplayName(submissionNumber: string): string {
     const idx = submissions.findIndex((s) => s.submissionNumber === submissionNumber)
@@ -103,11 +106,21 @@ export function LineupGrid({
       .sort((a, b) => (a.positionIndex ?? 0) - (b.positionIndex ?? 0))
   }
 
-  function resolveSimultaneousDJs(stageId: string, eventIndex: number): { positionIndex: 1 | 2 | 3; djName: string }[] {
-    return getSimultaneousAssignments(stageId, eventIndex).map((a) => ({
-      positionIndex: a.positionIndex as 1 | 2 | 3,
-      djName: isBlankAssignment(a) ? getBlankLabel(a) : getDisplayName(a.submissionNumber),
-    }))
+  function resolveSimultaneousDJs(stageId: string, eventIndex: number): { positionIndex: 1 | 2 | 3; djName: string; submissionNumber: string; genre: string; isUnavailable: boolean; daysAvailable: string }[] {
+    return getSimultaneousAssignments(stageId, eventIndex).map((a) => {
+      if (isBlankAssignment(a)) {
+        return { positionIndex: a.positionIndex as 1 | 2 | 3, djName: getBlankLabel(a), submissionNumber: '', genre: '', isUnavailable: false, daysAvailable: '' }
+      }
+      const sub = submissions.find((s) => s.submissionNumber === a.submissionNumber)
+      return {
+        positionIndex: a.positionIndex as 1 | 2 | 3,
+        djName: getDisplayName(a.submissionNumber),
+        submissionNumber: a.submissionNumber,
+        genre: sub?.genre ?? '',
+        isUnavailable: sub ? !sub.daysAvailable.toLowerCase().includes(evening.toLowerCase()) : false,
+        daysAvailable: sub?.daysAvailable ?? '',
+      }
+    })
   }
 
   function nextSimultaneousPosition(stageId: string, eventIndex: number): 1 | 2 | 3 | null {
@@ -207,6 +220,7 @@ export function LineupGrid({
                       key={`${stage.id}-${evtIdx}`}
                       stageId={stage.id}
                       evening={evening}
+                      eventIndex={evtIdx}
                       assignedDJs={resolveSimultaneousDJs(stage.id, evtIdx)}
                       nextPosition={nextSimultaneousPosition(stage.id, evtIdx)}
                       onAddClick={() => {
@@ -221,6 +235,7 @@ export function LineupGrid({
                         const pos = nextSimultaneousPosition(stage.id, evtIdx)
                         if (pos) onAddSimultaneous(stage.id, evening, pos, subNum, evtIdx)
                       }}
+                      onMoveAssignment={onMoveAssignment}
                       onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex, evtIdx)}
                       isActive={activeSlotKey === `${stage.id}|${evening}|${evtIdx}|simultaneous`}
                       gridRowStart={evtIdx + 2}
@@ -271,6 +286,7 @@ export function LineupGrid({
                               key={`${stage.id}-${ei}`}
                               stageId={stage.id}
                               evening={evening}
+                              eventIndex={ei}
                               assignedDJs={resolveSimultaneousDJs(stage.id, ei)}
                               nextPosition={nextSimultaneousPosition(stage.id, ei)}
                               onAddClick={() => {
@@ -286,6 +302,7 @@ export function LineupGrid({
                                 if (pos) onAddSimultaneous(stage.id, evening, pos, subNum, ei)
                               }}
                               onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex, ei)}
+                              onMoveAssignment={onMoveAssignment}
                               isActive={activeSlotKey === `${stage.id}|${evening}|${ei}|simultaneous`}
                               gridRowStart={gridRowStart}
                               gridRowEnd={gridRowEnd}
@@ -343,37 +360,80 @@ export function LineupGrid({
                         : getDisplayName(assignment.submissionNumber)
                       : null
                     const stageColor = stageColorMap[stage.id]
+                    const submission = assignment && !isBlankAssignment(assignment)
+                      ? submissions.find((s) => s.submissionNumber === assignment.submissionNumber)
+                      : undefined
+                    const genre = submission?.genre ?? ''
+                    const isUnavailable = submission
+                      ? !submission.daysAvailable.toLowerCase().includes(evening.toLowerCase())
+                      : false
+                    const submissionNumber = assignment && !isBlankAssignment(assignment) ? assignment.submissionNumber : null
+                    const isDragOver = dragOverKey === slotKey
                     return assignment ? (
                       <button
                         key={`${stage.id}-${timeLabel}`}
                         type="button"
-                        className={`grid-cell grid-slot ${isBlank ? 'grid-slot--blank' : 'grid-slot--occupied'}${isActive ? ' grid-slot--active' : ''}`}
+                        className={`grid-cell grid-slot ${isBlank ? 'grid-slot--blank' : 'grid-slot--occupied'}${isActive ? ' grid-slot--active' : ''}${isDragOver ? ' grid-slot--drag-over' : ''}${isUnavailable ? ' grid-slot--availability-error' : ''}`}
                         style={!isBlank && stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
-                        onClick={() =>
-                          onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
-                        }
+                        title={isUnavailable ? `Available: ${submission!.daysAvailable}` : undefined}
+                        draggable={!isBlank}
+                        onDragStart={!isBlank && submissionNumber ? (e) => {
+                          e.dataTransfer.setData('application/dj-slot-key', JSON.stringify({ stageId: stage.id, evening, slotIndex, eventIndex }))
+                          e.dataTransfer.setData('application/dj-submission-number', submissionNumber)
+                          e.dataTransfer.effectAllowed = 'move'
+                        } : undefined}
+                        onDragEnter={(e) => { e.preventDefault(); setDragOverKey(slotKey) }}
+                        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null) }}
                         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
                         onDrop={(e) => {
                           e.preventDefault()
-                          const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                          if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
+                          setDragOverKey(null)
+                          const slotKeyData = e.dataTransfer.getData('application/dj-slot-key')
+                          if (slotKeyData) {
+                            onMoveAssignment(JSON.parse(slotKeyData) as SlotCoord, { stageId: stage.id, evening, slotIndex, eventIndex })
+                          } else {
+                            const subNum = e.dataTransfer.getData('application/dj-submission-number')
+                            if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
+                          }
                         }}
+                        onClick={() =>
+                          onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
+                        }
                       >
                         {assignedLabel}
+                        {!isBlank && genre && <span className="slot-genre">{genre}</span>}
+                        {!isBlank && (
+                          <button
+                            type="button"
+                            className="slot-remove-btn"
+                            title="Remove DJ"
+                            onClick={(e) => { e.stopPropagation(); onRemove(stage.id, evening, slotIndex, eventIndex) }}
+                          >
+                            ×
+                          </button>
+                        )}
                       </button>
                     ) : (
                       <button
                         key={`${stage.id}-${timeLabel}`}
                         type="button"
-                        className={`grid-cell grid-slot grid-slot--empty${isActive ? ' grid-slot--active' : ''}`}
+                        className={`grid-cell grid-slot grid-slot--empty${isActive ? ' grid-slot--active' : ''}${dragOverKey === slotKey ? ' grid-slot--drag-over' : ''}`}
                         onClick={() =>
                           onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
                         }
+                        onDragEnter={(e) => { e.preventDefault(); setDragOverKey(slotKey) }}
+                        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null) }}
                         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
                         onDrop={(e) => {
                           e.preventDefault()
-                          const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                          if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
+                          setDragOverKey(null)
+                          const slotKeyData = e.dataTransfer.getData('application/dj-slot-key')
+                          if (slotKeyData) {
+                            onMoveAssignment(JSON.parse(slotKeyData) as SlotCoord, { stageId: stage.id, evening, slotIndex, eventIndex })
+                          } else {
+                            const subNum = e.dataTransfer.getData('application/dj-submission-number')
+                            if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
+                          }
                         }}
                       >
                         +
@@ -392,14 +452,25 @@ export function LineupGrid({
 
 // ── SimultaneousCell ──────────────────────────────────────────────────────────
 
+interface AssignedDJInfo {
+  positionIndex: 1 | 2 | 3
+  djName: string
+  submissionNumber: string
+  genre: string
+  isUnavailable: boolean
+  daysAvailable: string
+}
+
 interface SimultaneousCellProps {
   stageId: string
   evening: string
-  assignedDJs: { positionIndex: 1 | 2 | 3; djName: string }[]
+  eventIndex: number
+  assignedDJs: AssignedDJInfo[]
   nextPosition: 1 | 2 | 3 | null
   onAddClick: () => void
   onRemove: (positionIndex: 1 | 2 | 3) => void
   onDrop: (submissionNumber: string) => void
+  onMoveAssignment: (from: SlotCoord, to: SlotCoord) => void
   onCellClick?: () => void
   isActive?: boolean
   gridRowStart: number
@@ -410,11 +481,15 @@ interface SimultaneousCellProps {
 }
 
 function SimultaneousCell({
+  stageId,
+  evening,
+  eventIndex,
   assignedDJs,
   nextPosition,
   onAddClick,
   onRemove,
   onDrop,
+  onMoveAssignment,
   onCellClick,
   isActive,
   gridRowStart,
@@ -422,27 +497,52 @@ function SimultaneousCell({
   gridColumn,
   color,
 }: SimultaneousCellProps) {
+  const [isDragOver, setIsDragOver] = useState(false)
+  const isFull = nextPosition === null
   return (
     <div
-      className={`grid-cell grid-slot grid-slot--simultaneous${isActive ? ' grid-slot--active' : ''}`}
+      className={`grid-cell grid-slot grid-slot--simultaneous${isActive ? ' grid-slot--active' : ''}${isDragOver ? ' grid-slot--drag-over' : ''}`}
       style={{
         gridRow: `${gridRowStart} / ${gridRowEnd}`,
         gridColumn,
         ...(color ? { borderColor: color, backgroundColor: hexToTint(color, 0.12) } : {}),
       }}
       onClick={onCellClick}
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = nextPosition === null ? 'none' : 'move' }}
+      onDragEnter={(e) => { e.preventDefault(); if (!isFull) setIsDragOver(true) }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false) }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = isFull ? 'none' : 'move' }}
       onDrop={(e) => {
         e.preventDefault()
-        if (nextPosition === null) return
+        setIsDragOver(false)
+        if (isFull) return
+        const slotKeyData = e.dataTransfer.getData('application/dj-slot-key')
+        if (slotKeyData) {
+          if (nextPosition === null) return
+          onMoveAssignment(JSON.parse(slotKeyData) as SlotCoord, { stageId, evening, positionIndex: nextPosition, eventIndex })
+          return
+        }
         const subNum = e.dataTransfer.getData('application/dj-submission-number')
         if (subNum) onDrop(subNum)
       }}
     >
       <div className="simultaneous-djs">
         {assignedDJs.map((a) => (
-          <div key={a.positionIndex} className="simultaneous-dj-badge">
-            <span className="simultaneous-dj-name">{a.djName}</span>
+          <div
+            key={a.positionIndex}
+            className={`simultaneous-dj-badge${a.isUnavailable ? ' simultaneous-dj-badge--availability-error' : ''}`}
+            title={a.isUnavailable ? `Available: ${a.daysAvailable}` : undefined}
+            draggable={!!a.submissionNumber}
+            onDragStart={a.submissionNumber ? (e) => {
+              e.stopPropagation()
+              e.dataTransfer.setData('application/dj-slot-key', JSON.stringify({ stageId, evening, positionIndex: a.positionIndex, eventIndex }))
+              e.dataTransfer.setData('application/dj-submission-number', a.submissionNumber)
+              e.dataTransfer.effectAllowed = 'move'
+            } : undefined}
+          >
+            <div className="simultaneous-dj-info">
+              <span className="simultaneous-dj-name">{a.djName}</span>
+              {a.genre && <span className="slot-genre">{a.genre}</span>}
+            </div>
             <button
               type="button"
               className="simultaneous-dj-remove"

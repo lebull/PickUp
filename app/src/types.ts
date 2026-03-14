@@ -53,6 +53,15 @@ export function getBlankLabel(a: BlankSlotAssignment): string {
   return a.blankLabel || 'Blocked'
 }
 
+/** Identifies a slot for drag-and-drop move operations. */
+export type SlotCoord =
+  | { stageId: string; evening: string; slotIndex: number; eventIndex: number }
+  | { stageId: string; evening: string; positionIndex: 1 | 2 | 3; eventIndex: number }
+
+export function isSimultaneousCoord(c: SlotCoord): c is { stageId: string; evening: string; positionIndex: 1 | 2 | 3; eventIndex: number } {
+  return 'positionIndex' in c
+}
+
 export interface LineupState {
   stages: Stage[]
   assignments: SlotAssignment[]

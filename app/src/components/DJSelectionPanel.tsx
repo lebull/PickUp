@@ -479,7 +479,7 @@ export function DJSelectionPanel({
       {/* Focus-stage selector */}
       {prefStageNames.length > 0 && (
         <div className="dj-panel-filters">
-          <span className="filter-label">Focus:</span>
+          <span className="filter-label">Preference:</span>
           {prefStageNames.map((name) => (
             <button
               key={name}

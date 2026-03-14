@@ -6,7 +6,8 @@ import { StageGrid } from './StageGrid.tsx'
 import { StageConfigPanel } from './StageConfigPanel.tsx'
 import { DJSelectionPanel } from './DJSelectionPanel.tsx'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
-import type { Stage, SlotAssignment } from '../types.ts'
+import type { Stage, SlotAssignment, SlotCoord } from '../types.ts'
+import { isSimultaneousCoord } from '../types.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { getSlotLabels } from '../lineupUtils.ts'
 import { hexToTint } from '../stageColors.ts'
@@ -172,6 +173,65 @@ export function LineupView() {
     })
   }
 
+  function handleMoveAssignment(from: SlotCoord, to: SlotCoord) {
+    // Same simultaneous cell (any position) → no-op
+    if (
+      isSimultaneousCoord(from) && isSimultaneousCoord(to) &&
+      from.stageId === to.stageId && from.evening === to.evening &&
+      from.eventIndex === to.eventIndex
+    ) return
+    // Same sequential slot → no-op
+    if (
+      !isSimultaneousCoord(from) && !isSimultaneousCoord(to) &&
+      from.stageId === to.stageId && from.evening === to.evening &&
+      from.slotIndex === to.slotIndex && from.eventIndex === to.eventIndex
+    ) return
+
+    setProject((prev) => {
+      if (!prev) return prev
+      const assignments = [...prev.assignments]
+
+      const srcIdx = isSimultaneousCoord(from)
+        ? assignments.findIndex(
+            (a) => a.stageId === from.stageId && a.evening === from.evening &&
+              a.positionIndex === from.positionIndex && (a.eventIndex ?? 0) === from.eventIndex
+          )
+        : assignments.findIndex(
+            (a) => a.stageId === from.stageId && a.evening === from.evening &&
+              a.slotIndex === from.slotIndex && (a.eventIndex ?? 0) === from.eventIndex
+          )
+      if (srcIdx === -1) return prev
+      const srcAssignment = assignments[srcIdx]
+
+      const tgtIdx = isSimultaneousCoord(to)
+        ? assignments.findIndex(
+            (a) => a.stageId === to.stageId && a.evening === to.evening &&
+              a.positionIndex === to.positionIndex && (a.eventIndex ?? 0) === to.eventIndex
+          )
+        : assignments.findIndex(
+            (a) => a.stageId === to.stageId && a.evening === to.evening &&
+              a.slotIndex === to.slotIndex && (a.eventIndex ?? 0) === to.eventIndex
+          )
+      const tgtAssignment = tgtIdx !== -1 ? assignments[tgtIdx] : undefined
+
+      const result = assignments.filter((_, i) => i !== srcIdx && i !== tgtIdx)
+
+      const newAtTarget: SlotAssignment = isSimultaneousCoord(to)
+        ? { ...srcAssignment, stageId: to.stageId, evening: to.evening, positionIndex: to.positionIndex, eventIndex: to.eventIndex, slotIndex: undefined }
+        : { ...srcAssignment, stageId: to.stageId, evening: to.evening, slotIndex: to.slotIndex, eventIndex: to.eventIndex, positionIndex: undefined }
+      result.push(newAtTarget)
+
+      if (tgtAssignment) {
+        const newAtSource: SlotAssignment = isSimultaneousCoord(from)
+          ? { ...tgtAssignment, stageId: from.stageId, evening: from.evening, positionIndex: from.positionIndex, eventIndex: from.eventIndex, slotIndex: undefined }
+          : { ...tgtAssignment, stageId: from.stageId, evening: from.evening, slotIndex: from.slotIndex, eventIndex: from.eventIndex, positionIndex: undefined }
+        result.push(newAtSource)
+      }
+
+      return { ...prev, assignments: result }
+    })
+  }
+
   function handleAssignBlank(stageId: string, evening: string, slotIndex: number, blankLabel?: string, eventIndex = 0) {
     setProject((prev) => {
       if (!prev) return prev
@@ -333,6 +393,7 @@ export function LineupView() {
                 onRemove={handleRemove}
                 onAddSimultaneous={handleAddSimultaneous}
                 onRemoveSimultaneous={handleRemoveSimultaneous}
+                onMoveAssignment={handleMoveAssignment}
                 activeSlotKey={
                   activeSlot
                     ? activeSlot.positionIndex != null
@@ -352,6 +413,7 @@ export function LineupView() {
                 onRemove={handleRemove}
                 onAddSimultaneous={handleAddSimultaneous}
                 onRemoveSimultaneous={handleRemoveSimultaneous}
+                onMoveAssignment={handleMoveAssignment}
                 onConfigureStages={() => setShowStageConfig(true)}
                 onSlotClick={setActiveSlot}
                 onSimultaneousClick={handleSimultaneousClick}

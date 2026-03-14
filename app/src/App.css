@@ -911,10 +911,65 @@
   font-weight: 500;
   width: 100%;
   height: 100%;
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
 }
 
 .grid-slot--occupied:hover {
   background: #223a22;
+}
+
+.slot-genre {
+  display: block;
+  font-size: 0.7rem;
+  color: #888;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-remove-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 1px 4px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s, background 0.1s;
+}
+
+.grid-slot--occupied:hover .slot-remove-btn,
+.grid-slot--occupied:focus-within .slot-remove-btn {
+  opacity: 1;
+}
+
+.slot-remove-btn:hover {
+  color: #e07070;
+  background: rgba(224, 112, 112, 0.15);
+}
+
+.grid-slot--drag-over {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+}
+
+.grid-slot--availability-error {
+  box-shadow: 0 0 0 2px #f59e0b inset;
+  background-color: rgba(245, 158, 11, 0.08) !important;
+}
+
+.simultaneous-dj-badge--availability-error {
+  border-color: #f59e0b !important;
+  background: rgba(245, 158, 11, 0.1) !important;
 }
 
 .grid-slot--blank {
@@ -975,12 +1030,18 @@
   gap: 0.5rem;
 }
 
+.simultaneous-dj-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
 .simultaneous-dj-name {
   color: #a0a0e8;
   font-size: 0.85rem;
   font-weight: 500;
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
