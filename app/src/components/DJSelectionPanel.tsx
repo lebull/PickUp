@@ -203,7 +203,7 @@ export function DJSelectionPanel({
   onAddSimultaneous,
   onRemoveSimultaneous,
   onAssignBlank,
-  onAddBlankSimultaneous,
+  onAddBlankSimultaneous: _onAddBlankSimultaneous,
   onPositionSelect,
   onSelectSlot,
   onClose,

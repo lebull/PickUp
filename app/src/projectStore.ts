@@ -56,7 +56,7 @@ function normalizeProject(project: Project): Project {
     // type was added in the blank-slot-assignment change.
     // Legacy DJ assignments without the field default to type: 'dj'.
     assignments: (project.assignments ?? []).map((a): SlotAssignment => {
-      const aAny = a as Record<string, unknown>
+      const aAny = a as unknown as Record<string, unknown>
       if (aAny.type === 'blank' || aAny.type === 'dj') return a as SlotAssignment
       return { ...a, type: 'dj' } as SlotAssignment
     }),

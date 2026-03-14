@@ -33,11 +33,11 @@ export function SlotPicker({
   )
 
   // Submissions already assigned anywhere in the lineup (globally)
-  const assignedNumbers = new Set(assignments.map((a) => a.submissionNumber))
+  const assignedNumbers = new Set(assignments.flatMap(a => a.type === 'dj' ? [a.submissionNumber] : []))
 
   // Available pool: available on this evening, not assigned anywhere
   const available = submissions.filter((s) => {
-    if (currentAssignment && s.submissionNumber === currentAssignment.submissionNumber) return false
+    if (currentAssignment && currentAssignment.type === 'dj' && s.submissionNumber === currentAssignment.submissionNumber) return false
     if (assignedNumbers.has(s.submissionNumber)) return false
     return s.daysAvailable.toLowerCase().includes(activeSlot.evening.toLowerCase())
   })
@@ -52,7 +52,7 @@ export function SlotPicker({
           <button type="button" className="close-btn" onClick={onClose}>✕</button>
         </div>
 
-        {currentAssignment && (
+        {currentAssignment && currentAssignment.type === 'dj' && (
           <div className="slot-picker-current">
             <span>Currently: <strong>{submissions.find((s) => s.submissionNumber === currentAssignment.submissionNumber)?.djName ?? currentAssignment.submissionNumber}</strong></span>
             <button

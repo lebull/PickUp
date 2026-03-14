@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { getEveningTimeAxis, eventsOverlap } from '../lineupUtils.ts'
 import type { Stage } from '../types.ts'
-import { migrateProject } from '../migrateMultiEvent.ts'
+import { migrateProject, type LegacyStageSchedule } from '../migrateMultiEvent.ts'
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ describe('migrateProject', () => {
 
     expect(Array.isArray(result.stages[0].schedule['Friday'])).toBe(true)
     expect(result.stages[0].schedule['Friday']).toHaveLength(1)
-    expect(result.stages[0].schedule['Friday'][0]).toMatchObject({
+    expect((result.stages[0].schedule['Friday'] as LegacyStageSchedule[])[0]).toMatchObject({
       startTime: '20:00',
       endTime: '24:00',
     })

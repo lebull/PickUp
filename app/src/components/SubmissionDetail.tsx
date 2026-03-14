@@ -81,7 +81,7 @@ interface Props {
 }
 
 export function SubmissionDetail({ submission: s, onBack }: Props) {
-  const { hiddenNames, appContext } = useAppPreferences()
+  const { hiddenNames } = useAppPreferences()
   const { project, toggleDiscardSubmission } = useProjectContext()
   const isDiscarded = (project.discardedSubmissions ?? []).includes(s.submissionNumber)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -221,7 +221,7 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
         </Section>
       )}
 
-      {appContext === 'moonlight' ? (
+      {false ? (
         <>{moonlightSection}{mainScoreSection}</>
       ) : (
         <>{mainScoreSection}{moonlightSection}</>

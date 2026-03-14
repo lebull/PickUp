@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventSlots } from '../lineupUtils.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 
