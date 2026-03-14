@@ -197,7 +197,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                   </div>
                 ) : (
                   <>
-                    <div className="stage-field-row">
+                    <div className="stage-card-header">
                       <span
                         className="stage-drag-handle"
                         draggable
@@ -207,29 +207,40 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                       >
                         ⠿
                       </span>
-                      <label className="stage-field-label">Name</label>
                       <input
                         className="stage-name-input"
                         value={stage.name}
                         onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                         placeholder="Stage name"
                       />
-                      <label className="stage-field-label">Type</label>
-                      <select
-                        className="stage-type-select"
-                        value={stage.stageType ?? 'sequential'}
-                        onChange={(e) =>
-                          updateStage(stage.id, {
-                            stageType: e.target.value as 'sequential' | 'simultaneous',
-                          })
-                        }
+                      <button
+                        type="button"
+                        className="btn-danger btn-small"
+                        onClick={() => requestDelete(stage.id)}
                       >
-                        <option value="sequential">Sequential</option>
-                        <option value="simultaneous">Simultaneous</option>
-                      </select>
+                        Delete
+                      </button>
+                    </div>
+
+                    <div className="stage-settings-row">
+                      <div className="stage-setting">
+                        <span className="stage-field-label">Type</span>
+                        <select
+                          className="stage-type-select"
+                          value={stage.stageType ?? 'sequential'}
+                          onChange={(e) =>
+                            updateStage(stage.id, {
+                              stageType: e.target.value as 'sequential' | 'simultaneous',
+                            })
+                          }
+                        >
+                          <option value="sequential">Sequential</option>
+                          <option value="simultaneous">Simultaneous</option>
+                        </select>
+                      </div>
                       {(stage.stageType ?? 'sequential') === 'sequential' && (
-                        <>
-                          <label className="stage-field-label">Slot (min)</label>
+                        <div className="stage-setting">
+                          <span className="stage-field-label">Slot (min)</span>
                           <input
                             type="number"
                             className="slot-duration-input"
@@ -240,26 +251,16 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                               updateStage(stage.id, { slotDuration: Number(e.target.value) })
                             }
                           />
-                        </>
+                        </div>
                       )}
-                      {(stage.stageType ?? 'sequential') === 'simultaneous' && (
-                        <span className="simultaneous-note">Up to 3 DJs play simultaneously</span>
-                      )}
-                      <label className="stage-field-label stage-moonlight-label">
+                      <label className="stage-moonlight-toggle">
                         <input
                           type="checkbox"
                           checked={stage.useMoonlightScores ?? false}
                           onChange={(e) => updateStage(stage.id, { useMoonlightScores: e.target.checked })}
                         />
-                        {' '}Use Moonlight Scores
+                        Use Moonlight Scores
                       </label>
-                      <button
-                        type="button"
-                        className="btn-danger btn-small"
-                        onClick={() => requestDelete(stage.id)}
-                      >
-                        Delete
-                      </button>
                     </div>
 
                     <div className="stage-days-section">
@@ -303,12 +304,21 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                                           updateEventField(stage.id, day, evtIdx, 'startTime', e.target.value)
                                         }
                                       />
-                                      <span className="stage-field-label">to</span>
+                                      <span className="stage-field-label">–</span>
                                       <input
                                         type="time"
                                         value={event.endTime}
                                         onChange={(e) =>
                                           updateEventField(stage.id, day, evtIdx, 'endTime', e.target.value)
+                                        }
+                                      />
+                                      <input
+                                        type="text"
+                                        className="event-label-input"
+                                        value={event.label ?? ''}
+                                        placeholder="Label (e.g. Evening Set)"
+                                        onChange={(e) =>
+                                          updateEventField(stage.id, day, evtIdx, 'label', e.target.value)
                                         }
                                       />
                                       {crossesMidnight && (
@@ -319,15 +329,6 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                                           {labels.length} slot{labels.length !== 1 ? 's' : ''}
                                         </span>
                                       )}
-                                      <input
-                                        type="text"
-                                        className="event-label-input"
-                                        value={event.label ?? ''}
-                                        placeholder="e.g. Evening Set"
-                                        onChange={(e) =>
-                                          updateEventField(stage.id, day, evtIdx, 'label', e.target.value)
-                                        }
-                                      />
                                       {events.length > 1 && (
                                         <button
                                           type="button"
@@ -339,7 +340,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                                         </button>
                                       )}
                                       {overlap && (
-                                        <span className="overlap-error">⚠ Overlaps another event</span>
+                                        <span className="overlap-error">⚠ Overlaps</span>
                                       )}
                                     </div>
                                   )
@@ -349,7 +350,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                                   className="btn-secondary btn-small add-event-btn"
                                   onClick={() => addEvent(stage.id, day)}
                                 >
-                                  + Add Event
+                                  + Add Same Day Event
                                 </button>
                               </div>
                             )}
