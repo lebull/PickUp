@@ -2,18 +2,24 @@ import { useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useProjectContext } from '../ProjectContext.ts'
 import { LineupGrid } from './LineupGrid.tsx'
+import { StageGrid } from './StageGrid.tsx'
 import { StageConfigPanel } from './StageConfigPanel.tsx'
 import { DJSelectionPanel } from './DJSelectionPanel.tsx'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
 import type { Stage, SlotAssignment } from '../types.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { getSlotLabels } from '../lineupUtils.ts'
+import { hexToTint } from '../stageColors.ts'
 
 export function LineupView() {
   const { project, setProject, submissions, rowCountMismatch, setRowCountMismatch } = useProjectContext()
 
   const [showStageConfig, setShowStageConfig] = useState(false)
   const [activeSlot, setActiveSlot] = useState<ActiveSlot | null>(null)
+  const [viewMode, setViewMode] = useState<'day' | 'stage'>('day')
+  const [activeStageId, setActiveStageId] = useState<string | null>(
+    project.stages[0]?.id ?? null
+  )
   const { day } = useParams<{ day?: string }>()
   const navigate = useNavigate()
 
@@ -229,6 +235,20 @@ export function LineupView() {
     navigate(`/project/${project.id}/lineup/${evening.toLowerCase()}`)
   }
 
+  function handleToggleViewMode(mode: 'day' | 'stage') {
+    if (mode === viewMode) return
+    setActiveSlot(null)
+    if (mode === 'stage' && activeStageId === null) {
+      setActiveStageId(project.stages[0]?.id ?? null)
+    }
+    setViewMode(mode)
+  }
+
+  function handleSelectStage(stageId: string) {
+    setActiveStageId(stageId)
+    setActiveSlot(null)
+  }
+
   return (
     <div className="lineup-layout">
       {rowCountMismatch && (
@@ -250,52 +270,120 @@ export function LineupView() {
               }
             }}
           >
-            <LineupGrid
-              submissions={submissions}
-              stages={project.stages}
-              assignments={project.assignments}
-              selectedEvening={selectedEvening}
-              onSelectEvening={handleSelectEvening}
-              onAssign={handleAssign}
-              onRemove={handleRemove}
-              onAddSimultaneous={handleAddSimultaneous}
-              onRemoveSimultaneous={handleRemoveSimultaneous}
-              onConfigureStages={() => setShowStageConfig(true)}
-              onSlotClick={setActiveSlot}
-              onSimultaneousClick={handleSimultaneousClick}
-              activeSlotKey={
-                activeSlot
-                  ? activeSlot.positionIndex != null
-                    ? `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|simultaneous`
-                    : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|${activeSlot.slotIndex}`
-                  : null
-              }
-            />
-          </div>
-          {activeSlot ? (
-            <DJSelectionPanel
-              submissions={submissions}
-              stages={project.stages}
-              assignments={project.assignments}
-              discardedSubmissionNumbers={new Set(project.discardedSubmissions ?? [])}
-              activeSlot={activeSlot}
-              onAssign={handleAssign}
-              onRemove={handleRemove}
-              onAddSimultaneous={handleAddSimultaneous}
-              onRemoveSimultaneous={handleRemoveSimultaneous}
-              onAssignBlank={handleAssignBlank}
-              onAddBlankSimultaneous={handleAddBlankSimultaneous}
-              onPositionSelect={(pos) => setActiveSlot((prev) => prev ? { ...prev, positionIndex: pos } : prev)}
-              onSelectSlot={(slotIndex, timeLabel) =>
-                setActiveSlot((prev) => prev ? { ...prev, slotIndex, timeLabel, positionIndex: undefined } : prev)
-              }
-              onClose={() => setActiveSlot(null)}
-            />
-          ) : (
-            <div className="lineup-empty-state">
-              <p>Drag and drop a DJ to a slot, or click a slot to get started</p>
+            {/* View mode toggle */}
+            <div className="lineup-view-toggle">
+              <div className="lineup-view-toggle-buttons">
+                <button
+                  type="button"
+                  className={`lineup-view-btn${viewMode === 'day' ? ' active' : ''}`}
+                  onClick={() => handleToggleViewMode('day')}
+                >
+                  Day View
+                </button>
+                <button
+                  type="button"
+                  className={`lineup-view-btn${viewMode === 'stage' ? ' active' : ''}`}
+                  onClick={() => handleToggleViewMode('stage')}
+                >
+                  Stage View
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-small configure-btn"
+                  onClick={() => setShowStageConfig(true)}
+                >
+                  ⚙ Stages
+                </button>
+              </div>
+              {/* Stage selector — shown only in stage view */}
+              {viewMode === 'stage' && (
+                <div className="lineup-stage-selector">
+                  {project.stages.map((stg) => (
+                    <button
+                      key={stg.id}
+                      type="button"
+                      className={`lineup-stage-btn${activeStageId === stg.id ? ' active' : ''}`}
+                      style={
+                        stg.color
+                          ? {
+                            borderColor: stg.color,
+                            ...(activeStageId === stg.id
+                              ? { backgroundColor: hexToTint(stg.color, 0.2), color: stg.color }
+                              : {}),
+                          }
+                          : undefined
+                      }
+                      onClick={() => handleSelectStage(stg.id)}
+                    >
+                      {stg.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+
+            {viewMode === 'stage' ? (
+              <StageGrid
+                submissions={submissions}
+                stages={project.stages}
+                assignments={project.assignments}
+                activeStageId={activeStageId}
+                onSlotClick={setActiveSlot}
+                onAssign={handleAssign}
+                onRemove={handleRemove}
+                onAddSimultaneous={handleAddSimultaneous}
+                onRemoveSimultaneous={handleRemoveSimultaneous}
+                activeSlotKey={
+                  activeSlot
+                    ? activeSlot.positionIndex != null
+                      ? `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|simultaneous`
+                      : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|${activeSlot.slotIndex}`
+                    : null
+                }
+              />
+            ) : (
+              <LineupGrid
+                submissions={submissions}
+                stages={project.stages}
+                assignments={project.assignments}
+                selectedEvening={selectedEvening}
+                onSelectEvening={handleSelectEvening}
+                onAssign={handleAssign}
+                onRemove={handleRemove}
+                onAddSimultaneous={handleAddSimultaneous}
+                onRemoveSimultaneous={handleRemoveSimultaneous}
+                onConfigureStages={() => setShowStageConfig(true)}
+                onSlotClick={setActiveSlot}
+                onSimultaneousClick={handleSimultaneousClick}
+                activeSlotKey={
+                  activeSlot
+                    ? activeSlot.positionIndex != null
+                      ? `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|simultaneous`
+                      : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|${activeSlot.slotIndex}`
+                    : null
+                }
+              />
+            )}
+          </div>
+          <DJSelectionPanel
+            submissions={submissions}
+            stages={project.stages}
+            assignments={project.assignments}
+            discardedSubmissionNumbers={new Set(project.discardedSubmissions ?? [])}
+            activeSlot={activeSlot}
+            currentEvening={selectedEvening}
+            onAssign={handleAssign}
+            onRemove={handleRemove}
+            onAddSimultaneous={handleAddSimultaneous}
+            onRemoveSimultaneous={handleRemoveSimultaneous}
+            onAssignBlank={handleAssignBlank}
+            onAddBlankSimultaneous={handleAddBlankSimultaneous}
+            onPositionSelect={(pos) => setActiveSlot((prev) => prev ? { ...prev, positionIndex: pos } : prev)}
+            onSelectSlot={(slotIndex, timeLabel) =>
+              setActiveSlot((prev) => prev ? { ...prev, slotIndex, timeLabel, positionIndex: undefined } : prev)
+            }
+            onClose={() => setActiveSlot(null)}
+          />
         </SplitPane>
       </div>
       {showStageConfig && (

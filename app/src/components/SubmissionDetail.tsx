@@ -81,7 +81,7 @@ interface Props {
 }
 
 export function SubmissionDetail({ submission: s, onBack }: Props) {
-  const { hiddenNames } = useAppPreferences()
+  const { hiddenNames, appContext } = useAppPreferences()
   const { project, toggleDiscardSubmission } = useProjectContext()
   const isDiscarded = (project.discardedSubmissions ?? []).includes(s.submissionNumber)
   const [menuOpen, setMenuOpen] = useState(false)

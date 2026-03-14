@@ -22,7 +22,9 @@ interface Props {
   stages: Stage[]
   assignments: SlotAssignment[]
   discardedSubmissionNumbers: Set<string>
-  activeSlot: ActiveSlot
+  activeSlot: ActiveSlot | null
+  /** The currently selected evening, used for filtering when no slot is active. */
+  currentEvening: string
   onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex: number) => void
   onRemove: (stageId: string, evening: string, slotIndex: number, eventIndex: number) => void
   onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
@@ -195,6 +197,7 @@ export function DJSelectionPanel({
   assignments,
   discardedSubmissionNumbers,
   activeSlot,
+  currentEvening,
   onAssign,
   onRemove,
   onAddSimultaneous,
@@ -208,9 +211,11 @@ export function DJSelectionPanel({
   const { hiddenNames, timeFormat } = useAppPreferences()
   const [focusStage, setFocusStage] = useState<string | null>(null)
 
-  const isSimultaneous = activeSlot.positionIndex != null
-  const stage = stages.find((s) => s.id === activeSlot.stageId)
-  const useMoonlight = stage?.useMoonlightScores ?? false
+  const isBrowsing = activeSlot === null
+  const isSimultaneous = activeSlot?.positionIndex != null
+  const stage = activeSlot ? stages.find((s) => s.id === activeSlot.stageId) : undefined
+  const useMoonlight = !isBrowsing && (stage?.useMoonlightScores ?? false)
+  const effectiveEvening = activeSlot?.evening ?? currentEvening
 
   // Derive grouping options from the actual preference values in submissions,
   // so the labels always match the spreadsheet strings exactly.
@@ -227,14 +232,14 @@ export function DJSelectionPanel({
   const [scorePeek, setScorePeek] = useState<{ sub: Submission; rect: DOMRect } | null>(null)
 
   // Reset focus stage only when the evening changes (inline state reset per React docs)
-  const [lastEvening, setLastEvening] = useState(activeSlot.evening)
-  if (activeSlot.evening !== lastEvening) {
-    setLastEvening(activeSlot.evening)
+  const [lastEvening, setLastEvening] = useState(effectiveEvening)
+  if (effectiveEvening !== lastEvening) {
+    setLastEvening(effectiveEvening)
     setFocusStage(null)
   }
 
   // For sequential slots: the currently assigned DJ for this exact slot
-  const currentAssignment = isSimultaneous
+  const currentAssignment = (isSimultaneous || !activeSlot)
     ? undefined
     : assignments.find(
         (a) =>
@@ -261,12 +266,12 @@ export function DJSelectionPanel({
       // Exclude discarded submissions
       if (discardedSubmissionNumbers.has(s.submissionNumber)) return false
       // Must be available this evening
-      if (!s.daysAvailable.toLowerCase().includes(activeSlot.evening.toLowerCase())) return false
+      if (!s.daysAvailable.toLowerCase().includes(effectiveEvening.toLowerCase())) return false
       // In moonlight context, only show moonlight-opted-in submissions
       if (useMoonlight && !s.moonlightInterest) return false
       return true
     })
-  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, activeSlot.evening, useMoonlight])
+  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, effectiveEvening, useMoonlight])
 
   // Sort by active-context score descending
   const sorted = useMemo(() => {
@@ -301,6 +306,7 @@ export function DJSelectionPanel({
   }
 
   function handleAssign(submissionNumber: string) {
+    if (!activeSlot) return // browsing state — no slot selected
     if (isSimultaneous) {
       onAddSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, submissionNumber)
     } else {
@@ -352,7 +358,9 @@ export function DJSelectionPanel({
   }
 
   function renderCard(s: Submission) {
-    const scoreVal = useMoonlight ? s.mlScore.avg : s.mainScore.avg
+    const mainScoreVal = s.mainScore.avg
+    const mlScoreVal = s.mlScore.avg
+    const scoreVal = useMoonlight ? mlScoreVal : mainScoreVal
     const hasPeek = scoreVal !== null
     return (
       <div
@@ -367,20 +375,27 @@ export function DJSelectionPanel({
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.submissionNumber) }}
-        aria-label={`Assign ${djLabel(s)}`}
+        aria-label={isBrowsing ? djLabel(s) : `Assign ${djLabel(s)}`}
       >
         <span className="dj-col-name" title={djLabel(s)}>{djLabel(s)}</span>
-        <span
-          className="dj-col-score"
-          title={fmt(scoreVal)}
-          onMouseEnter={hasPeek ? (e) => { e.stopPropagation(); setScorePeek({ sub: s, rect: e.currentTarget.getBoundingClientRect() }) } : undefined}
-          onMouseLeave={hasPeek ? () => setScorePeek(null) : undefined}
-        >
-          {fmt(scoreVal)}
-        </span>
+        {isBrowsing ? (
+          <>
+            <span className="dj-col-score" title={fmt(mainScoreVal)}>{fmt(mainScoreVal)}</span>
+            <span className="dj-col-score dj-col-score--ml" title={fmt(mlScoreVal)}>{fmt(mlScoreVal)}</span>
+          </>
+        ) : (
+          <span
+            className="dj-col-score"
+            title={fmt(scoreVal)}
+            onMouseEnter={hasPeek ? (e) => { e.stopPropagation(); setScorePeek({ sub: s, rect: e.currentTarget.getBoundingClientRect() }) } : undefined}
+            onMouseLeave={hasPeek ? () => setScorePeek(null) : undefined}
+          >
+            {fmt(scoreVal)}
+          </span>
+        )}
         <span className="dj-col-genre" title={s.genre || '—'}>{s.genre || '—'}</span>
         <span className="dj-col-format" title={s.formatGear || '—'}>{s.formatGear || '—'}</span>
-        {useMoonlight && (
+        {(useMoonlight || isBrowsing) && (
           <span className="dj-col-vibefit" title={s.mlVibefit || '—'}>{s.mlVibefit || '—'}</span>
         )}
         <span className="dj-col-stages" title={s.stagePreferences.filter(Boolean).join(', ') || '—'}>
@@ -397,57 +412,69 @@ export function DJSelectionPanel({
       {/* Header */}
       <div className="dj-panel-header">
         <div className="dj-panel-title">
-          <strong>{stage?.name ?? 'Stage'}</strong>
-          <span className="dj-panel-slot-label">
-            {activeSlot.evening}{isSimultaneous ? ' · Silent Disco' : ` · ${activeSlot.timeLabel}`}
-          </span>
+          {isBrowsing ? (
+            <strong>DJ Pool</strong>
+          ) : (
+            <>
+              <strong>{stage?.name ?? 'Stage'}</strong>
+              <span className="dj-panel-slot-label">
+                {activeSlot!.evening}{isSimultaneous ? ' · Silent Disco' : ` · ${activeSlot!.timeLabel}`}
+              </span>
+            </>
+          )}
         </div>
         <button type="button" className="close-btn" onClick={onClose} aria-label="Close panel">
           ✕
         </button>
       </div>
 
-      {/* Slot tray */}
-      <SlotTray
-        activeSlot={activeSlot}
-        stageSlotLabels={stage ? getSlotLabels(stage, activeSlot.evening, activeSlot.eventIndex ?? 0) : []}
-        stageAssignments={assignments.filter(
-          (a) =>
-            a.stageId === activeSlot.stageId &&
-            a.evening === activeSlot.evening &&
-            (a.eventIndex ?? 0) === (activeSlot.eventIndex ?? 0)
-        )}
-        submissions={submissions}
-        stageColor={stage?.color}
-        timeFormat={timeFormat}
-        getDisplayName={(subNum) => {
-          const s = submissions.find((sub) => sub.submissionNumber === subNum)
-          if (!s) return subNum
-          if (hiddenNames) {
-            const origIndex = submissions.indexOf(s)
-            return origIndex >= 0 ? `DJ #${origIndex + 1}` : subNum
+      {/* Slot tray or browsing guidance */}
+      {isBrowsing ? (
+        <div className="dj-panel-browse-guidance">
+          Click a slot or drag a DJ to assign
+        </div>
+      ) : (
+        <SlotTray
+          activeSlot={activeSlot!}
+          stageSlotLabels={stage ? getSlotLabels(stage, activeSlot!.evening, activeSlot!.eventIndex ?? 0) : []}
+          stageAssignments={assignments.filter(
+            (a) =>
+              a.stageId === activeSlot!.stageId &&
+              a.evening === activeSlot!.evening &&
+              (a.eventIndex ?? 0) === (activeSlot!.eventIndex ?? 0)
+          )}
+          submissions={submissions}
+          stageColor={stage?.color}
+          timeFormat={timeFormat}
+          getDisplayName={(subNum) => {
+            const s = submissions.find((sub) => sub.submissionNumber === subNum)
+            if (!s) return subNum
+            if (hiddenNames) {
+              const origIndex = submissions.indexOf(s)
+              return origIndex >= 0 ? `DJ #${origIndex + 1}` : subNum
+            }
+            return s.djName
+          }}
+          onAssignSequential={(slotIndex, subNum) =>
+            onAssign(activeSlot!.stageId, activeSlot!.evening, slotIndex, subNum, activeSlot!.eventIndex ?? 0)
           }
-          return s.djName
-        }}
-        onAssignSequential={(slotIndex, subNum) =>
-          onAssign(activeSlot.stageId, activeSlot.evening, slotIndex, subNum, activeSlot.eventIndex ?? 0)
-        }
-        onAssignSimultaneous={(pos, subNum) =>
-          onAddSimultaneous(activeSlot.stageId, activeSlot.evening, pos, subNum)
-        }
-        onRemoveSequential={(slotIndex) =>
-          onRemove(activeSlot.stageId, activeSlot.evening, slotIndex, activeSlot.eventIndex ?? 0)
-        }
-        onRemoveSimultaneous={(pos) =>
-          onRemoveSimultaneous(activeSlot.stageId, activeSlot.evening, pos)
-        }
-        onBlockSequential={(slotIndex) => {
-          onAssignBlank(activeSlot.stageId, activeSlot.evening, slotIndex, 'Blocked', activeSlot.eventIndex ?? 0)
-          onClose()
-        }}
-        onSelectPosition={onPositionSelect}
-        onSelectSlot={onSelectSlot}
-      />
+          onAssignSimultaneous={(pos, subNum) =>
+            onAddSimultaneous(activeSlot!.stageId, activeSlot!.evening, pos, subNum)
+          }
+          onRemoveSequential={(slotIndex) =>
+            onRemove(activeSlot!.stageId, activeSlot!.evening, slotIndex, activeSlot!.eventIndex ?? 0)
+          }
+          onRemoveSimultaneous={(pos) =>
+            onRemoveSimultaneous(activeSlot!.stageId, activeSlot!.evening, pos)
+          }
+          onBlockSequential={(slotIndex) => {
+            onAssignBlank(activeSlot!.stageId, activeSlot!.evening, slotIndex, 'Blocked', activeSlot!.eventIndex ?? 0)
+            onClose()
+          }}
+          onSelectPosition={onPositionSelect}
+          onSelectSlot={onSelectSlot}
+        />
+      )}
 
       {/* Focus-stage selector */}
       {prefStageNames.length > 0 && (
@@ -469,10 +496,17 @@ export function DJSelectionPanel({
       {/* Column headers */}
       <div className="dj-panel-list-header">
         <span className="dj-col-name">DJ</span>
-        <span className="dj-col-score">{useMoonlight ? 'ML' : 'Score'}</span>
+        {isBrowsing ? (
+          <>
+            <span className="dj-col-score">Score</span>
+            <span className="dj-col-score dj-col-score--ml">ML</span>
+          </>
+        ) : (
+          <span className="dj-col-score">{useMoonlight ? 'ML' : 'Score'}</span>
+        )}
         <span className="dj-col-genre">Genre</span>
         <span className="dj-col-format">Format / Gear</span>
-        {useMoonlight && <span className="dj-col-vibefit">Vibefit</span>}
+        {(useMoonlight || isBrowsing) && <span className="dj-col-vibefit">Vibefit</span>}
         <span className="dj-col-stages">Stage Prefs</span>
       </div>
       </div>

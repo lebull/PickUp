@@ -151,9 +151,6 @@ export function LineupGrid({
             {day}
           </button>
         ))}
-        <button type="button" className="btn-secondary btn-small configure-btn" onClick={onConfigureStages}>
-          ⚙ Stages
-        </button>
       </div>
 
       {activeEvenings.length === 0 ? (

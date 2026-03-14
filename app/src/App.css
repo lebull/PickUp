@@ -719,6 +719,7 @@
 .evening-selector {
   display: flex;
   gap: 0.5rem;
+  margin-top: 0.5rem;
   margin-bottom: 1rem;
   align-items: center;
   flex-wrap: wrap;
@@ -751,6 +752,84 @@
 
 /* ── Schedule grid ───────────────────────────────────────── */
 .lineup-grid-container {
+  padding-bottom: 2rem;
+}
+
+/* ── View mode toggle & stage selector ────────────────────── */
+.lineup-view-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lineup-view-toggle-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.lineup-view-toggle-buttons > .lineup-view-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.lineup-view-toggle-buttons > .lineup-view-btn:nth-child(2) {
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+
+.lineup-view-btn {
+  padding: 0.35rem 0.85rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #999;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lineup-view-btn + .lineup-view-btn {
+  border-left: 1px solid #444;
+}
+
+.lineup-view-btn.active {
+  background: #1e3a5f;
+  color: #7ab8f5;
+  font-weight: 600;
+}
+
+.lineup-view-btn:hover:not(.active) {
+  background: #333;
+  color: #ccc;
+}
+
+.lineup-stage-selector {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.lineup-stage-btn {
+  padding: 0.35rem 0.85rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #aaa;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.lineup-stage-btn:hover:not(.active) {
+  background: #333;
+  color: #ccc;
+}
+
+.lineup-stage-btn.active {
+  font-weight: 600;
+}
+
+/* ── Stage grid container ─────────────────────────────────── */
+.stage-grid-container {
+  margin-top: 1rem;
   padding-bottom: 2rem;
 }
 
@@ -1852,6 +1931,18 @@ input[type="time"] {
 .dj-panel-slot-label {
   color: #888;
   font-size: 0.8rem;
+}
+
+.dj-panel-browse-guidance {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #2e2e2e;
+  font-size: 0.8rem;
+  color: #666;
+  font-style: italic;
+}
+
+.dj-col-score--ml {
+  color: #c080f0;
 }
 
 .slot-tray {
