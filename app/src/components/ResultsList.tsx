@@ -23,7 +23,7 @@ type ResultRow = DJRow | BlankRow
 function getSlotTimeLabel(assignment: BlankSlotAssignment, stage: Stage): string {
   if (assignment.positionIndex != null) return `Position ${assignment.positionIndex}`
   if (assignment.slotIndex != null) {
-    const labels = getSlotLabels(stage, assignment.evening)
+    const labels = getSlotLabels(stage, assignment.evening, assignment.eventIndex ?? 0)
     const label = labels[assignment.slotIndex]
     return label ? `${assignment.evening} · ${label}` : assignment.evening
   }

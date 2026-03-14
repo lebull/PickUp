@@ -11,6 +11,8 @@ export interface ActiveSlot {
   /** Set for sequential slots. Omitted for simultaneous slots. */
   slotIndex?: number
   timeLabel: string
+  /** Zero-based event index for sequential slots. Omitted for simultaneous slots. */
+  eventIndex?: number
   /** Set for simultaneous slots. Omitted for sequential slots. */
   positionIndex?: 1 | 2 | 3
 }
@@ -21,11 +23,11 @@ interface Props {
   assignments: SlotAssignment[]
   discardedSubmissionNumbers: Set<string>
   activeSlot: ActiveSlot
-  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
-  onRemove: (stageId: string, evening: string, slotIndex: number) => void
+  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex: number) => void
+  onRemove: (stageId: string, evening: string, slotIndex: number, eventIndex: number) => void
   onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
   onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3) => void
-  onAssignBlank: (stageId: string, evening: string, slotIndex: number, blankLabel?: string) => void
+  onAssignBlank: (stageId: string, evening: string, slotIndex: number, blankLabel?: string, eventIndex?: number) => void
   onAddBlankSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, blankLabel?: string) => void
   onPositionSelect: (positionIndex: 1 | 2 | 3) => void
   /** Called when the user clicks a sequential slot row in the tray to change the active slot. */
@@ -238,6 +240,7 @@ export function DJSelectionPanel({
         (a) =>
           a.stageId === activeSlot.stageId &&
           a.evening === activeSlot.evening &&
+          (a.eventIndex ?? 0) === (activeSlot.eventIndex ?? 0) &&
           a.slotIndex === activeSlot.slotIndex
       )
 
@@ -301,7 +304,7 @@ export function DJSelectionPanel({
     if (isSimultaneous) {
       onAddSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, submissionNumber)
     } else {
-      onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, submissionNumber)
+      onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, submissionNumber, activeSlot.eventIndex ?? 0)
     }
     // Panel stays open — parent (LineupView) advances the active slot
   }
@@ -407,9 +410,12 @@ export function DJSelectionPanel({
       {/* Slot tray */}
       <SlotTray
         activeSlot={activeSlot}
-        stageSlotLabels={stage ? getSlotLabels(stage, activeSlot.evening) : []}
+        stageSlotLabels={stage ? getSlotLabels(stage, activeSlot.evening, activeSlot.eventIndex ?? 0) : []}
         stageAssignments={assignments.filter(
-          (a) => a.stageId === activeSlot.stageId && a.evening === activeSlot.evening
+          (a) =>
+            a.stageId === activeSlot.stageId &&
+            a.evening === activeSlot.evening &&
+            (a.eventIndex ?? 0) === (activeSlot.eventIndex ?? 0)
         )}
         submissions={submissions}
         stageColor={stage?.color}
@@ -424,19 +430,19 @@ export function DJSelectionPanel({
           return s.djName
         }}
         onAssignSequential={(slotIndex, subNum) =>
-          onAssign(activeSlot.stageId, activeSlot.evening, slotIndex, subNum)
+          onAssign(activeSlot.stageId, activeSlot.evening, slotIndex, subNum, activeSlot.eventIndex ?? 0)
         }
         onAssignSimultaneous={(pos, subNum) =>
           onAddSimultaneous(activeSlot.stageId, activeSlot.evening, pos, subNum)
         }
         onRemoveSequential={(slotIndex) =>
-          onRemove(activeSlot.stageId, activeSlot.evening, slotIndex)
+          onRemove(activeSlot.stageId, activeSlot.evening, slotIndex, activeSlot.eventIndex ?? 0)
         }
         onRemoveSimultaneous={(pos) =>
           onRemoveSimultaneous(activeSlot.stageId, activeSlot.evening, pos)
         }
         onBlockSequential={(slotIndex) => {
-          onAssignBlank(activeSlot.stageId, activeSlot.evening, slotIndex, 'Blocked')
+          onAssignBlank(activeSlot.stageId, activeSlot.evening, slotIndex, 'Blocked', activeSlot.eventIndex ?? 0)
           onClose()
         }}
         onSelectPosition={onPositionSelect}

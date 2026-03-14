@@ -36,27 +36,34 @@ export function LineupView() {
     return <Navigate replace to={`/project/${project.id}/lineup/${target}`} />
   }
 
-  /** Returns the next empty sequential ActiveSlot within the same stage, or null if none. */
+  /** Returns the next empty sequential ActiveSlot within the same stage event, or null if none. */
   function findNextEmptySlot(
     stages: Stage[],
     assignments: SlotAssignment[],
     evening: string,
     currentSlot: ActiveSlot
   ): ActiveSlot | null {
-    // Only scan within the same stage — never silently switch the active event
+    // Only scan within the same stage and same event — never silently switch context
     const stage = stages.find(
       (s) => s.id === currentSlot.stageId && (s.stageType ?? 'sequential') === 'sequential'
     )
     if (!stage) return null
 
-    const labels = getSlotLabels(stage, evening)
+    const eventIndex = currentSlot.eventIndex ?? 0
+    const labels = getSlotLabels(stage, evening, eventIndex)
     const allSlots: ActiveSlot[] = labels.map((timeLabel, slotIndex) => ({
-      stageId: stage.id, evening, slotIndex, timeLabel,
+      stageId: stage.id, evening, slotIndex, eventIndex, timeLabel,
     }))
 
     const occupied = new Set(
       assignments
-        .filter((a) => a.stageId === currentSlot.stageId && a.evening === evening && a.slotIndex != null)
+        .filter(
+          (a) =>
+            a.stageId === currentSlot.stageId &&
+            a.evening === evening &&
+            (a.eventIndex ?? 0) === eventIndex &&
+            a.slotIndex != null
+        )
         .map((a) => a.slotIndex as number)
     )
 
@@ -71,25 +78,24 @@ export function LineupView() {
     return null
   }
 
-  function handleSimultaneousClick(slot: { stageId: string; evening: string; positionIndex: 1 | 2 | 3; timeLabel: string }) {
+  function handleSimultaneousClick(slot: { stageId: string; evening: string; positionIndex: 1 | 2 | 3; timeLabel: string; eventIndex: number }) {
     setActiveSlot(slot)
   }
 
   if (submissions === null) return null
 
-  function handleAssign(stageId: string, evening: string, slotIndex: number, submissionNumber: string) {
+  function handleAssign(stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex = 0) {
     setProject((prev) => {
       if (!prev) return prev
       const assignments = [
         ...prev.assignments.filter(
-          (a) => !(a.stageId === stageId && a.evening === evening && a.slotIndex === slotIndex)
+          (a) => !(a.stageId === stageId && a.evening === evening && (a.eventIndex ?? 0) === eventIndex && a.slotIndex === slotIndex)
         ),
-        { type: 'dj', stageId, evening, slotIndex, submissionNumber },
+        { type: 'dj', stageId, evening, slotIndex, eventIndex, submissionNumber } as SlotAssignment,
       ]
-      // Advance active slot to the next empty sequential slot on this evening
+      // Advance active slot to the next empty sequential slot within the same stage event
       if (activeSlot) {
-        const newAssignments = assignments
-        const nextSlot = findNextEmptySlot(prev.stages, newAssignments, evening, activeSlot)
+        const nextSlot = findNextEmptySlot(prev.stages, assignments, evening, activeSlot)
         if (nextSlot) {
           setActiveSlot(nextSlot)
         }
@@ -99,27 +105,28 @@ export function LineupView() {
     })
   }
 
-  function handleRemove(stageId: string, evening: string, slotIndex: number) {
+  function handleRemove(stageId: string, evening: string, slotIndex: number, eventIndex = 0) {
     setProject((prev) => {
       if (!prev) return prev
       const assignments = prev.assignments.filter(
-        (a) => !(a.stageId === stageId && a.evening === evening && a.slotIndex === slotIndex)
+        (a) => !(a.stageId === stageId && a.evening === evening && (a.eventIndex ?? 0) === eventIndex && a.slotIndex === slotIndex)
       )
       return { ...prev, assignments }
     })
     // Do NOT clear activeSlot — keep it selected so user can assign a replacement immediately
   }
 
-  /** Adds a DJ to the next available simultaneous stage position (1–3). */
+  /** Adds a DJ to the next available simultaneous stage position (1–3) for a specific event. */
   function handleAddSimultaneous(
     stageId: string,
     evening: string,
     _positionIndex: 1 | 2 | 3,
-    submissionNumber: string
+    submissionNumber: string,
+    eventIndex = 0
   ) {
     const positions: (1 | 2 | 3)[] = [1, 2, 3]
     const existing = project.assignments.filter(
-      (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+      (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null && (a.eventIndex ?? 0) === eventIndex
     )
     if (existing.length >= 3) return
     const usedSet = new Set(existing.map((a) => a.positionIndex as 1 | 2 | 3))
@@ -129,7 +136,7 @@ export function LineupView() {
     setProject((prev) => {
       if (!prev) return prev
       const prevExisting = prev.assignments.filter(
-        (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+        (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null && (a.eventIndex ?? 0) === eventIndex
       )
       if (prevExisting.length >= 3) return prev
       const prevUsed = new Set(prevExisting.map((a) => a.positionIndex as 1 | 2 | 3))
@@ -137,7 +144,7 @@ export function LineupView() {
       if (!prevNextPos) return prev
       return {
         ...prev,
-        assignments: [...prev.assignments, { type: 'dj', stageId, evening, positionIndex: prevNextPos, submissionNumber }],
+        assignments: [...prev.assignments, { type: 'dj', stageId, evening, positionIndex: prevNextPos, eventIndex, submissionNumber }],
       }
     })
 
@@ -149,24 +156,24 @@ export function LineupView() {
   }
 
   /** Removes a DJ from a simultaneous stage position. */
-  function handleRemoveSimultaneous(stageId: string, evening: string, positionIndex: 1 | 2 | 3) {
+  function handleRemoveSimultaneous(stageId: string, evening: string, positionIndex: 1 | 2 | 3, eventIndex = 0) {
     setProject((prev) => {
       if (!prev) return prev
       const assignments = prev.assignments.filter(
-        (a) => !(a.stageId === stageId && a.evening === evening && a.positionIndex === positionIndex)
+        (a) => !(a.stageId === stageId && a.evening === evening && a.positionIndex === positionIndex && (a.eventIndex ?? 0) === eventIndex)
       )
       return { ...prev, assignments }
     })
   }
 
-  function handleAssignBlank(stageId: string, evening: string, slotIndex: number, blankLabel?: string) {
+  function handleAssignBlank(stageId: string, evening: string, slotIndex: number, blankLabel?: string, eventIndex = 0) {
     setProject((prev) => {
       if (!prev) return prev
       const assignments: SlotAssignment[] = [
         ...prev.assignments.filter(
-          (a) => !(a.stageId === stageId && a.evening === evening && a.slotIndex === slotIndex)
+          (a) => !(a.stageId === stageId && a.evening === evening && (a.eventIndex ?? 0) === eventIndex && a.slotIndex === slotIndex)
         ),
-        { type: 'blank', stageId, evening, slotIndex, blankLabel: blankLabel || undefined },
+        { type: 'blank', stageId, evening, slotIndex, eventIndex, blankLabel: blankLabel || undefined },
       ]
       if (activeSlot) {
         const nextSlot = findNextEmptySlot(prev.stages, assignments, evening, activeSlot)
@@ -176,10 +183,10 @@ export function LineupView() {
     })
   }
 
-  function handleAddBlankSimultaneous(stageId: string, evening: string, _positionIndex: 1 | 2 | 3, blankLabel?: string) {
+  function handleAddBlankSimultaneous(stageId: string, evening: string, _positionIndex: 1 | 2 | 3, blankLabel?: string, eventIndex = 0) {
     const positions: (1 | 2 | 3)[] = [1, 2, 3]
     const existing = project.assignments.filter(
-      (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+      (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null && (a.eventIndex ?? 0) === eventIndex
     )
     if (existing.length >= 3) return
     const usedSet = new Set(existing.map((a) => a.positionIndex as 1 | 2 | 3))
@@ -189,7 +196,7 @@ export function LineupView() {
     setProject((prev) => {
       if (!prev) return prev
       const prevExisting = prev.assignments.filter(
-        (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null
+        (a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null && (a.eventIndex ?? 0) === eventIndex
       )
       if (prevExisting.length >= 3) return prev
       const prevUsed = new Set(prevExisting.map((a) => a.positionIndex as 1 | 2 | 3))
@@ -197,7 +204,7 @@ export function LineupView() {
       if (!prevNextPos) return prev
       return {
         ...prev,
-        assignments: [...prev.assignments, { type: 'blank', stageId, evening, positionIndex: prevNextPos, blankLabel: blankLabel || undefined }],
+        assignments: [...prev.assignments, { type: 'blank', stageId, evening, positionIndex: prevNextPos, eventIndex, blankLabel: blankLabel || undefined }],
       }
     })
 
@@ -259,8 +266,8 @@ export function LineupView() {
               activeSlotKey={
                 activeSlot
                   ? activeSlot.positionIndex != null
-                    ? `${activeSlot.stageId}|${activeSlot.evening}|simultaneous`
-                    : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.slotIndex}`
+                    ? `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|simultaneous`
+                    : `${activeSlot.stageId}|${activeSlot.evening}|${activeSlot.eventIndex ?? 0}|${activeSlot.slotIndex}`
                   : null
               }
             />

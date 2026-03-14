@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
-import type { Stage, SlotAssignment } from '../types.ts'
-import { CONVENTION_DAYS, getSlotLabels } from '../lineupUtils.ts'
+import type { Stage, StageSchedule, SlotAssignment } from '../types.ts'
+import { CONVENTION_DAYS, getSlotLabels, getEventLabel, eventsOverlap } from '../lineupUtils.ts'
 import { STAGE_COLOR_PALETTE } from '../stageColors.ts'
 
 interface Props {
@@ -21,8 +21,24 @@ function newStage(): Stage {
   }
 }
 
+/** Returns true if the given event overlaps any other event in the list (not including itself at `selfIdx`). */
+function hasOverlap(events: StageSchedule[], selfIdx: number): boolean {
+  for (let i = 0; i < events.length; i++) {
+    if (i === selfIdx) continue
+    if (eventsOverlap(events[selfIdx], events[i])) return true
+  }
+  return false
+}
+
 export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props) {
-  const [draft, setDraft] = useState<Stage[]>(() => stages.map((s) => ({ ...s, schedule: { ...s.schedule } })))
+  const [draft, setDraft] = useState<Stage[]>(() =>
+    stages.map((s) => ({
+      ...s,
+      schedule: Object.fromEntries(
+        Object.entries(s.schedule).map(([day, events]) => [day, events.map((e) => ({ ...e }))])
+      ),
+    }))
+  )
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
@@ -39,28 +55,54 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
           ? [...s.activeDays, day]
           : s.activeDays.filter((d) => d !== day)
         const schedule = { ...s.schedule }
-        if (checked && !schedule[day]) {
-          schedule[day] = { startTime: '', endTime: '' }
+        if (checked && (!schedule[day] || schedule[day].length === 0)) {
+          schedule[day] = [{ startTime: '', endTime: '' }]
         }
         return { ...s, activeDays, schedule }
       })
     )
   }
 
-  function updateSchedule(
+  function updateEventField(
     stageId: string,
     day: string,
-    field: 'startTime' | 'endTime',
+    eventIdx: number,
+    field: 'startTime' | 'endTime' | 'label',
     value: string
   ) {
     setDraft((prev) =>
       prev.map((s) => {
         if (s.id !== stageId) return s
-        const schedule = {
-          ...s.schedule,
-          [day]: { ...(s.schedule[day] ?? { startTime: '', endTime: '' }), [field]: value },
+        const events = [...(s.schedule[day] ?? [{ startTime: '', endTime: '' }])]
+        events[eventIdx] = { ...events[eventIdx], [field]: value }
+        return { ...s, schedule: { ...s.schedule, [day]: events } }
+      })
+    )
+  }
+
+  function addEvent(stageId: string, day: string) {
+    setDraft((prev) =>
+      prev.map((s) => {
+        if (s.id !== stageId) return s
+        const events = [...(s.schedule[day] ?? []), { startTime: '', endTime: '' }]
+        return { ...s, schedule: { ...s.schedule, [day]: events } }
+      })
+    )
+  }
+
+  function removeEvent(stageId: string, day: string, eventIdx: number) {
+    setDraft((prev) =>
+      prev.map((s) => {
+        if (s.id !== stageId) return s
+        const events = (s.schedule[day] ?? []).filter((_, i) => i !== eventIdx)
+        // Keep at least one empty slot when the last event is removed
+        return {
+          ...s,
+          schedule: {
+            ...s.schedule,
+            [day]: events.length > 0 ? events : [{ startTime: '', endTime: '' }],
+          },
         }
-        return { ...s, schedule }
       })
     )
   }
@@ -224,13 +266,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                       <span className="stage-field-label">Schedule by day</span>
                       {CONVENTION_DAYS.map((day) => {
                         const isActive = stage.activeDays.includes(day)
-                        const daySchedule = stage.schedule[day] ?? { startTime: '', endTime: '' }
-                        const labels = isActive ? getSlotLabels(stage, day) : []
-                        const crossesMidnight =
-                          isActive &&
-                          daySchedule.startTime &&
-                          daySchedule.endTime &&
-                          daySchedule.endTime <= daySchedule.startTime
+                        const events = isActive ? (stage.schedule[day] ?? [{ startTime: '', endTime: '' }]) : []
 
                         return (
                           <div key={day} className={`day-schedule-row${isActive ? ' day-schedule-row--active' : ''}`}>
@@ -243,32 +279,79 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                               <span className="day-schedule-name">{day}</span>
                             </label>
                             {isActive && (
-                              <>
-                                <input
-                                  type="time"
-                                  value={daySchedule.startTime}
-                                  onChange={(e) =>
-                                    updateSchedule(stage.id, day, 'startTime', e.target.value)
-                                  }
-                                />
-                                <span className="stage-field-label">to</span>
-                                <input
-                                  type="time"
-                                  value={daySchedule.endTime}
-                                  onChange={(e) =>
-                                    updateSchedule(stage.id, day, 'endTime', e.target.value)
-                                  }
-                                />
-                                {crossesMidnight && (
-                                  <span className="midnight-hint" title="Event crosses midnight">↷ next day</span>
-                                )}
-                                {/* Slot count only meaningful for sequential stages */}
-                                {(stage.stageType ?? 'sequential') === 'sequential' && labels.length > 0 && (
-                                  <span className="slot-count-hint">
-                                    {labels.length} slot{labels.length !== 1 ? 's' : ''}
-                                  </span>
-                                )}
-                              </>
+                              <div className="day-events-list">
+                                {events.map((event, evtIdx) => {
+                                  const crossesMidnight =
+                                    event.startTime &&
+                                    event.endTime &&
+                                    event.endTime <= event.startTime
+                                  const overlap = hasOverlap(events, evtIdx)
+                                  const labels = (stage.stageType ?? 'sequential') === 'sequential'
+                                    ? getSlotLabels(stage, day, evtIdx)
+                                    : []
+                                  return (
+                                    <div key={evtIdx} className="day-event-row">
+                                      {events.length > 1 && (
+                                        <span className="day-event-label-badge">
+                                          {getEventLabel(event, evtIdx)}
+                                        </span>
+                                      )}
+                                      <input
+                                        type="time"
+                                        value={event.startTime}
+                                        onChange={(e) =>
+                                          updateEventField(stage.id, day, evtIdx, 'startTime', e.target.value)
+                                        }
+                                      />
+                                      <span className="stage-field-label">to</span>
+                                      <input
+                                        type="time"
+                                        value={event.endTime}
+                                        onChange={(e) =>
+                                          updateEventField(stage.id, day, evtIdx, 'endTime', e.target.value)
+                                        }
+                                      />
+                                      {crossesMidnight && (
+                                        <span className="midnight-hint" title="Event crosses midnight">↷ next day</span>
+                                      )}
+                                      {(stage.stageType ?? 'sequential') === 'sequential' && labels.length > 0 && (
+                                        <span className="slot-count-hint">
+                                          {labels.length} slot{labels.length !== 1 ? 's' : ''}
+                                        </span>
+                                      )}
+                                      <input
+                                        type="text"
+                                        className="event-label-input"
+                                        value={event.label ?? ''}
+                                        placeholder="e.g. Evening Set"
+                                        onChange={(e) =>
+                                          updateEventField(stage.id, day, evtIdx, 'label', e.target.value)
+                                        }
+                                      />
+                                      {events.length > 1 && (
+                                        <button
+                                          type="button"
+                                          className="btn-danger btn-small"
+                                          title="Remove this event"
+                                          onClick={() => removeEvent(stage.id, day, evtIdx)}
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
+                                      {overlap && (
+                                        <span className="overlap-error">⚠ Overlaps another event</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                                <button
+                                  type="button"
+                                  className="btn-secondary btn-small add-event-btn"
+                                  onClick={() => addEvent(stage.id, day)}
+                                >
+                                  + Add Event
+                                </button>
+                              </div>
                             )}
                           </div>
                         )

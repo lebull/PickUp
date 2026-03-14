@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Submission, Stage, SlotAssignment } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel } from '../lineupUtils.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventSlots } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 
@@ -11,16 +11,16 @@ interface Props {
   assignments: SlotAssignment[]
   selectedEvening: string
   onSelectEvening: (evening: string) => void
-  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string) => void
-  onRemove: (stageId: string, evening: string, slotIndex: number) => void
-  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
-  onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3) => void
+  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex: number) => void
+  onRemove: (stageId: string, evening: string, slotIndex: number, eventIndex: number) => void
+  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string, eventIndex: number) => void
+  onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, eventIndex: number) => void
   onConfigureStages: () => void
   /** Called when a sequential slot cell is clicked; parent owns the active slot state. */
-  onSlotClick: (slot: { stageId: string; evening: string; slotIndex: number; timeLabel: string }) => void
+  onSlotClick: (slot: { stageId: string; evening: string; slotIndex: number; eventIndex: number; timeLabel: string }) => void
   /** Called when an "Add DJ" button on a simultaneous cell is clicked; parent owns the active slot state. */
-  onSimultaneousClick: (slot: { stageId: string; evening: string; positionIndex: 1 | 2 | 3; timeLabel: string }) => void
-  activeSlotKey: string | null // "stageId|evening|slotIndex" used to highlight
+  onSimultaneousClick: (slot: { stageId: string; evening: string; positionIndex: 1 | 2 | 3; timeLabel: string; eventIndex: number }) => void
+  activeSlotKey: string | null // "stageId|evening|eventIndex|slotIndex" used to highlight
 }
 
 export function LineupGrid({
@@ -63,14 +63,18 @@ export function LineupGrid({
     [stages, evening]
   )
 
-  // Unified time axis: sorted union of all slot times from sequential stages this evening.
-  // Simultaneous stages contribute no labels (getSlotLabels returns [] for them) — intentional.
+  // Unified time axis: union of all slot times from all sequential stage events this evening.
   const timeAxis = useMemo(
     () => getEveningTimeAxis(eveningStages, evening),
     [eveningStages, evening]
   )
 
-  // Stages split by type for rendering decisions
+  // One column per stage — events are stacked within the column, not split across columns.
+  const stageColumns = useMemo(
+    () => eveningStages.map((stage) => ({ stage })),
+    [eveningStages]
+  )
+
   const simultaneousStages = useMemo(
     () => eveningStages.filter((s) => s.stageType === 'simultaneous'),
     [eveningStages]
@@ -83,29 +87,31 @@ export function LineupGrid({
     return map
   }, [stages])
 
-  function getAssignment(stageId: string, slotIndex: number): SlotAssignment | undefined {
+  function getAssignment(stageId: string, eventIndex: number, slotIndex: number): SlotAssignment | undefined {
     return assignments.find(
-      (a) => a.stageId === stageId && a.evening === evening && a.slotIndex === slotIndex
+      (a) =>
+        a.stageId === stageId &&
+        a.evening === evening &&
+        (a.eventIndex ?? 0) === eventIndex &&
+        a.slotIndex === slotIndex
     )
   }
 
-  function getSimultaneousAssignments(stageId: string): SlotAssignment[] {
-    // Pool exclusion is assignment-type-agnostic: assignments.map(a => a.submissionNumber) covers
-    // both sequential (slotIndex) and simultaneous (positionIndex) assignments.
+  function getSimultaneousAssignments(stageId: string, eventIndex: number): SlotAssignment[] {
     return assignments
-      .filter((a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null)
+      .filter((a) => a.stageId === stageId && a.evening === evening && a.positionIndex != null && (a.eventIndex ?? 0) === eventIndex)
       .sort((a, b) => (a.positionIndex ?? 0) - (b.positionIndex ?? 0))
   }
 
-  function resolveSimultaneousDJs(stageId: string): { positionIndex: 1 | 2 | 3; djName: string }[] {
-    return getSimultaneousAssignments(stageId).map((a) => ({
+  function resolveSimultaneousDJs(stageId: string, eventIndex: number): { positionIndex: 1 | 2 | 3; djName: string }[] {
+    return getSimultaneousAssignments(stageId, eventIndex).map((a) => ({
       positionIndex: a.positionIndex as 1 | 2 | 3,
       djName: isBlankAssignment(a) ? getBlankLabel(a) : getDisplayName(a.submissionNumber),
     }))
   }
 
-  function nextSimultaneousPosition(stageId: string): 1 | 2 | 3 | null {
-    const existing = getSimultaneousAssignments(stageId)
+  function nextSimultaneousPosition(stageId: string, eventIndex: number): 1 | 2 | 3 | null {
+    const existing = getSimultaneousAssignments(stageId, eventIndex)
     const usedPositions = new Set(existing.map((a) => a.positionIndex))
     for (const pos of [1, 2, 3] as const) {
       if (!usedPositions.has(pos)) return pos
@@ -124,8 +130,8 @@ export function LineupGrid({
     )
   }
 
-  // Total columns: time-label gutter + all evening stages
-  const totalColumns = eveningStages.length
+  // Total columns: time-label gutter + all stage-event columns
+  const totalColumns = stageColumns.length
 
   // Whether any sequential stage has times configured (determines if we render a time axis)
   const hasTimeAxis = timeAxis.length > 0
@@ -159,11 +165,11 @@ export function LineupGrid({
           className="lineup-grid"
           style={{ gridTemplateColumns: `80px repeat(${totalColumns}, 1fr)` }}
         >
-          {/* Header row */}
+          {/* Column header row */}
           <div className="grid-cell grid-header grid-corner" />
-          {eveningStages.map((stage) => (
+          {stageColumns.map(({ stage }) => (
             <div
-              key={stage.id}
+              key={`header-${stage.id}`}
               className="grid-cell grid-header grid-stage-header"
               style={stageColorMap[stage.id] ? { borderBottom: `3px solid ${stageColorMap[stage.id]}` } : undefined}
             >
@@ -175,58 +181,68 @@ export function LineupGrid({
           ))}
 
           {/*
-            When there are only simultaneous stages (no time axis), render a single
-            placeholder row so simultaneous cells still appear.
+            When there are only simultaneous stages (no time axis), render one row per event
+            so multi-event simultaneous stages each get their own cell.
           */}
-          {!hasTimeAxis && hasSimultaneous && (
-            <>
-              <div className="grid-cell grid-time-label">—</div>
-              {eveningStages.map((stage, stageIndex) => {
-                if ((stage.stageType ?? 'sequential') === 'sequential') {
+          {!hasTimeAxis && hasSimultaneous && (() => {
+            const maxEvents = Math.max(
+              ...eveningStages
+                .filter((s) => s.stageType === 'simultaneous')
+                .map((s) => Math.max((s.schedule?.[evening] ?? []).length, 1))
+            )
+            return Array.from({ length: maxEvents }, (_, evtIdx) => (
+              <>
+                <div key={`time-noaxis-${evtIdx}`} className="grid-cell grid-time-label">—</div>
+                {stageColumns.map(({ stage }, colIdx) => {
+                  if (stage.stageType !== 'simultaneous') {
+                    return evtIdx === 0 ? (
+                      <div key={`${stage.id}-unconf`} className="grid-cell grid-slot grid-slot--unconfigured">
+                        <span className="slot-config-hint">Set times for {evening}</span>
+                      </div>
+                    ) : <div key={`${stage.id}-blank-${evtIdx}`} className="grid-cell grid-slot grid-slot--out-of-range" />
+                  }
+                  const stageEvents = stage.schedule?.[evening] ?? []
+                  if (evtIdx >= stageEvents.length && stageEvents.length > 0) {
+                    return <div key={`${stage.id}-blank-${evtIdx}`} className="grid-cell grid-slot grid-slot--out-of-range" />
+                  }
                   return (
-                    <div key={stage.id} className="grid-cell grid-slot grid-slot--unconfigured">
-                      <span className="slot-config-hint">Set times for {evening}</span>
-                    </div>
+                    <SimultaneousCell
+                      key={`${stage.id}-${evtIdx}`}
+                      stageId={stage.id}
+                      evening={evening}
+                      assignedDJs={resolveSimultaneousDJs(stage.id, evtIdx)}
+                      nextPosition={nextSimultaneousPosition(stage.id, evtIdx)}
+                      onAddClick={() => {
+                        const pos = nextSimultaneousPosition(stage.id, evtIdx)
+                        if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—', eventIndex: evtIdx })
+                      }}
+                      onCellClick={() => {
+                        const pos = nextSimultaneousPosition(stage.id, evtIdx) ?? 1
+                        onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—', eventIndex: evtIdx })
+                      }}
+                      onDrop={(subNum) => {
+                        const pos = nextSimultaneousPosition(stage.id, evtIdx)
+                        if (pos) onAddSimultaneous(stage.id, evening, pos, subNum, evtIdx)
+                      }}
+                      onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex, evtIdx)}
+                      isActive={activeSlotKey === `${stage.id}|${evening}|${evtIdx}|simultaneous`}
+                      gridRowStart={evtIdx + 2}
+                      gridRowEnd={evtIdx + 3}
+                      gridColumn={colIdx + 2}
+                      color={stageColorMap[stage.id]}
+                    />
                   )
-                }
-                // Render simultaneous cell inline
-                return (
-                  <SimultaneousCell
-                    key={stage.id}
-                    stageId={stage.id}
-                    evening={evening}
-                    assignedDJs={resolveSimultaneousDJs(stage.id)}
-                    nextPosition={nextSimultaneousPosition(stage.id)}
-                    onAddClick={() => {
-                      const pos = nextSimultaneousPosition(stage.id)
-                      if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
-                    }}
-                    onCellClick={() => {
-                      const pos = nextSimultaneousPosition(stage.id) ?? 1
-                      onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
-                    }}
-                    onDrop={(subNum) => {
-                      const pos = nextSimultaneousPosition(stage.id)
-                      if (pos) onAddSimultaneous(stage.id, evening, pos, subNum)
-                    }}
-                    onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
-                    isActive={activeSlotKey === `${stage.id}|${evening}|simultaneous`}
-                    gridRowStart={2}
-                    gridRowEnd={3}
-                    gridColumn={stageIndex + 2}
-                    color={stageColorMap[stage.id]}
-                  />
-                )
-              })}
-            </>
-          )}
+                })}
+              </>
+            ))
+          })()}
 
           {/* No times configured for any sequential stage this evening */}
           {!hasTimeAxis && !hasSimultaneous && (
             <>
               <div className="grid-cell grid-time-label">—</div>
-              {eveningStages.map((stage) => (
-                <div key={stage.id} className="grid-cell grid-slot grid-slot--unconfigured">
+              {stageColumns.map(({ stage }) => (
+                <div key={`${stage.id}-unconf`} className="grid-cell grid-slot grid-slot--unconfigured">
                   <span className="slot-config-hint">Set times for {evening}</span>
                 </div>
               ))}
@@ -235,135 +251,141 @@ export function LineupGrid({
 
           {/* Normal time-axis rows */}
           {hasTimeAxis &&
-            timeAxis.map((timeLabel, rowIndex) => (
-              <>
-                <div key={`time-${timeLabel}`} className="grid-cell grid-time-label">
-                  {formatTimeLabel(timeLabel, timeFormat)}
-                </div>
-                {eveningStages.map((stage, stageIndex) => {
-                  // Simultaneous stages use explicit grid placement to span their time range.
-                  if (stage.stageType === 'simultaneous') {
-                    const colIndex = stageIndex + 2 // 1-based CSS col (col 1 = time gutter)
-                    const { gridRowStart, gridRowEnd } = getSimultaneousRowRange(stage, evening, timeAxis)
-                    const startRowIdx = gridRowStart - 2 // convert to 0-based timeAxis index
-                    const cellRow = rowIndex + 2 // 1-based CSS row for this timeAxis position
+            timeAxis.map((timeLabel, rowIndex) => {
+              const cellRow = rowIndex + 2 // header = row 1, first data row = row 2
+              return (
+                <>
+                  <div key={`time-${timeLabel}`} className="grid-cell grid-time-label">
+                    {formatTimeLabel(timeLabel, timeFormat)}
+                  </div>
+                  {stageColumns.map(({ stage }, colIdx) => {
+                    const cssCol = colIdx + 2
 
-                    if (rowIndex === startRowIdx) {
+                    // Simultaneous stages: each event spans its own time range within the column.
+                    if (stage.stageType === 'simultaneous') {
+                      const dayEvents = stage.schedule?.[evening] ?? []
+                      const eventCount = Math.max(dayEvents.length, 1)
+                      for (let ei = 0; ei < eventCount; ei++) {
+                        const { gridRowStart, gridRowEnd } = getSimultaneousRowRange(stage, evening, timeAxis, ei)
+                        const startRowIdx = gridRowStart - 2
+                        if (rowIndex === startRowIdx) {
+                          return (
+                            <SimultaneousCell
+                              key={`${stage.id}-${ei}`}
+                              stageId={stage.id}
+                              evening={evening}
+                              assignedDJs={resolveSimultaneousDJs(stage.id, ei)}
+                              nextPosition={nextSimultaneousPosition(stage.id, ei)}
+                              onAddClick={() => {
+                                const pos = nextSimultaneousPosition(stage.id, ei)
+                                if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—', eventIndex: ei })
+                              }}
+                              onCellClick={() => {
+                                const pos = nextSimultaneousPosition(stage.id, ei) ?? 1
+                                onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—', eventIndex: ei })
+                              }}
+                              onDrop={(subNum) => {
+                                const pos = nextSimultaneousPosition(stage.id, ei)
+                                if (pos) onAddSimultaneous(stage.id, evening, pos, subNum, ei)
+                              }}
+                              onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex, ei)}
+                              isActive={activeSlotKey === `${stage.id}|${evening}|${ei}|simultaneous`}
+                              gridRowStart={gridRowStart}
+                              gridRowEnd={gridRowEnd}
+                              gridColumn={cssCol}
+                              color={stageColorMap[stage.id]}
+                            />
+                          )
+                        }
+                        if (cellRow > gridRowStart && cellRow < gridRowEnd) return null
+                      }
                       return (
-                        <SimultaneousCell
-                          key={stage.id}
-                          stageId={stage.id}
-                          evening={evening}
-                          assignedDJs={resolveSimultaneousDJs(stage.id)}
-                          nextPosition={nextSimultaneousPosition(stage.id)}
-                          onAddClick={() => {
-                            const pos = nextSimultaneousPosition(stage.id)
-                            if (pos) onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
-                          }}
-                          onCellClick={() => {
-                            const pos = nextSimultaneousPosition(stage.id) ?? 1
-                            onSimultaneousClick({ stageId: stage.id, evening, positionIndex: pos, timeLabel: '—' })
-                          }}
-                          onDrop={(subNum) => {
-                            const pos = nextSimultaneousPosition(stage.id)
-                            if (pos) onAddSimultaneous(stage.id, evening, pos, subNum)
-                          }}
-                          onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex)}
-                          isActive={activeSlotKey === `${stage.id}|${evening}|simultaneous`}
-                          gridRowStart={gridRowStart}
-                          gridRowEnd={gridRowEnd}
-                          gridColumn={colIndex}
-                          color={stageColorMap[stage.id]}
+                        <div
+                          key={`${stage.id}-${timeLabel}-off`}
+                          className="grid-cell grid-slot grid-slot--out-of-range"
+                          style={{ gridColumn: cssCol, gridRow: cellRow }}
                         />
                       )
                     }
-                    if (cellRow > gridRowStart && cellRow < gridRowEnd) {
-                      // This row is visually covered by the SimultaneousCell above — skip.
-                      return null
+
+                    // Sequential stage: find which event (if any) owns this time label.
+                    const dayEvents = stage.schedule?.[evening] ?? []
+                    let eventIndex = -1
+                    let slotIndex = -1
+                    for (let ei = 0; ei < dayEvents.length; ei++) {
+                      const labels = getSlotLabels(stage, evening, ei)
+                      const si = labels.indexOf(timeLabel)
+                      if (si !== -1) { eventIndex = ei; slotIndex = si; break }
                     }
-                    // This row is outside the stage's configured time range.
-                    // Render an explicitly-placed placeholder so auto-placement of sequential
-                    // cells in neighbouring columns stays correctly aligned.
-                    return (
-                      <div
-                        key={`${stage.id}-${timeLabel}-off`}
-                        className="grid-cell grid-slot grid-slot--out-of-range"
-                        style={{ gridColumn: colIndex, gridRow: cellRow }}
-                      />
-                    )
-                  }
 
-                  // Sequential stage cell rendering
-                  const stageLabels = getSlotLabels(stage, evening)
-                  const slotIndex = stageLabels.indexOf(timeLabel)
+                    if (dayEvents.length === 0) {
+                      return (
+                        <div
+                          key={`${stage.id}-${timeLabel}`}
+                          className="grid-cell grid-slot grid-slot--unconfigured"
+                        />
+                      )
+                    }
 
-                  if (stageLabels.length === 0) {
-                    return (
-                      <div
+                    if (slotIndex === -1) {
+                      return (
+                        <div
+                          key={`${stage.id}-${timeLabel}`}
+                          className="grid-cell grid-slot grid-slot--out-of-range"
+                        />
+                      )
+                    }
+
+                    const assignment = getAssignment(stage.id, eventIndex, slotIndex)
+                    const slotKey = `${stage.id}|${evening}|${eventIndex}|${slotIndex}`
+                    const isActive = activeSlotKey === slotKey
+                    const isBlank = assignment ? isBlankAssignment(assignment) : false
+                    const assignedLabel = assignment
+                      ? isBlankAssignment(assignment)
+                        ? getBlankLabel(assignment)
+                        : getDisplayName(assignment.submissionNumber)
+                      : null
+                    const stageColor = stageColorMap[stage.id]
+                    return assignment ? (
+                      <button
                         key={`${stage.id}-${timeLabel}`}
-                        className="grid-cell grid-slot grid-slot--unconfigured"
-                      />
-                    )
-                  }
-
-                  if (slotIndex === -1) {
-                    return (
-                      <div
+                        type="button"
+                        className={`grid-cell grid-slot ${isBlank ? 'grid-slot--blank' : 'grid-slot--occupied'}${isActive ? ' grid-slot--active' : ''}`}
+                        style={!isBlank && stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
+                        onClick={() =>
+                          onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
+                        }
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          const subNum = e.dataTransfer.getData('application/dj-submission-number')
+                          if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
+                        }}
+                      >
+                        {assignedLabel}
+                      </button>
+                    ) : (
+                      <button
                         key={`${stage.id}-${timeLabel}`}
-                        className="grid-cell grid-slot grid-slot--out-of-range"
-                      />
+                        type="button"
+                        className={`grid-cell grid-slot grid-slot--empty${isActive ? ' grid-slot--active' : ''}`}
+                        onClick={() =>
+                          onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
+                        }
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          const subNum = e.dataTransfer.getData('application/dj-submission-number')
+                          if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
+                        }}
+                      >
+                        +
+                      </button>
                     )
-                  }
-
-                  const assignment = getAssignment(stage.id, slotIndex)
-                  const slotKey = `${stage.id}|${evening}|${slotIndex}`
-                  const isActive = activeSlotKey === slotKey
-                  const isBlank = assignment ? isBlankAssignment(assignment) : false
-                  const assignedLabel = assignment
-                    ? isBlankAssignment(assignment)
-                      ? getBlankLabel(assignment)
-                      : getDisplayName(assignment.submissionNumber)
-                    : null
-                  const stageColor = stageColorMap[stage.id]
-                  return assignment ? (
-                    <button
-                      key={`${stage.id}-${timeLabel}`}
-                      type="button"
-                      className={`grid-cell grid-slot ${isBlank ? 'grid-slot--blank' : 'grid-slot--occupied'}${isActive ? ' grid-slot--active' : ''}`}
-                      style={!isBlank && stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
-                      onClick={() =>
-                        onSlotClick({ stageId: stage.id, evening, slotIndex, timeLabel })
-                      }
-                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                        if (subNum) onAssign(stage.id, evening, slotIndex, subNum)
-                      }}
-                    >
-                      {assignedLabel}
-                    </button>
-                  ) : (
-                    <button
-                      key={`${stage.id}-${timeLabel}`}
-                      type="button"
-                      className={`grid-cell grid-slot grid-slot--empty${isActive ? ' grid-slot--active' : ''}`}
-                      onClick={() =>
-                        onSlotClick({ stageId: stage.id, evening, slotIndex, timeLabel })
-                      }
-                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                        if (subNum) onAssign(stage.id, evening, slotIndex, subNum)
-                      }}
-                    >
-                      +
-                    </button>
-                  )
-                })}
-              </>
-            ))}
+                  })}
+                </>
+              )
+            })}
         </div>
       )}
 

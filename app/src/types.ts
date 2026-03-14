@@ -3,6 +3,8 @@ import type { MainScore, MLScore } from './scoreCalculation.ts'
 export interface StageSchedule {
   startTime: string   // "HH:MM" 24-hour
   endTime: string     // "HH:MM" 24-hour (may be earlier than startTime for cross-midnight events)
+  /** Optional human-readable label for this event block (e.g. "Afternoon Set"). */
+  label?: string
 }
 
 export interface Stage {
@@ -11,8 +13,8 @@ export interface Stage {
   /** Whether DJs play sequentially in time slots or simultaneously for the whole event. Defaults to "sequential". */
   stageType: 'sequential' | 'simultaneous'
   activeDays: string[]
-  /** Per-day schedule. Key is the day name (e.g. "Friday"). Only used for sequential stages. */
-  schedule: Record<string, StageSchedule>
+  /** Per-day event schedule. Key is the day name (e.g. "Friday"). Each day holds one or more timed event blocks. Only used for sequential stages. */
+  schedule: Record<string, StageSchedule[]>
   slotDuration: number // minutes (sequential stages only)
   /** Optional display color as a hex string (e.g. "#6366f1"). Chosen from the curated stage color palette. */
   color?: string
@@ -23,6 +25,8 @@ export interface Stage {
 interface SlotAssignmentBase {
   stageId: string
   evening: string
+  /** Zero-based index into the stage's schedule array for this evening. Identifies which event this slot belongs to. Sequential stages only. */
+  eventIndex?: number
   /** Time-slot index for sequential stage assignments. Omitted for simultaneous assignments. */
   slotIndex?: number
   /** Position index (1–3) for simultaneous stage assignments. Omitted for sequential assignments. */
