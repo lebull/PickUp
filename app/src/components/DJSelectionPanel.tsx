@@ -4,6 +4,7 @@ import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import { getSlotLabels, formatTimeLabel } from '../lineupUtils.ts'
+import { isDJUnavailableOnEvening } from '../djAvailability.ts'
 
 export interface ActiveSlot {
   stageId: string
@@ -210,6 +211,7 @@ export function DJSelectionPanel({
 }: Props) {
   const { hiddenNames, timeFormat } = useAppPreferences()
   const [focusStage, setFocusStage] = useState<string | null>(null)
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false)
 
   const isBrowsing = activeSlot === null
   const isSimultaneous = activeSlot?.positionIndex != null
@@ -231,11 +233,12 @@ export function DJSelectionPanel({
 
   const [scorePeek, setScorePeek] = useState<{ sub: Submission; rect: DOMRect } | null>(null)
 
-  // Reset focus stage only when the evening changes (inline state reset per React docs)
+  // Reset focus stage and availability filter only when the evening changes (inline state reset per React docs)
   const [lastEvening, setLastEvening] = useState(effectiveEvening)
   if (effectiveEvening !== lastEvening) {
     setLastEvening(effectiveEvening)
     setFocusStage(null)
+    setShowAvailableOnly(false)
   }
 
   // For sequential slots: the currently assigned DJ for this exact slot
@@ -265,22 +268,26 @@ export function DJSelectionPanel({
       if (assignedNumbers.has(s.submissionNumber)) return false
       // Exclude discarded submissions
       if (discardedSubmissionNumbers.has(s.submissionNumber)) return false
-      // Must be available this evening
-      if (!s.daysAvailable.toLowerCase().includes(effectiveEvening.toLowerCase())) return false
       // In moonlight context, only show moonlight-opted-in submissions
       if (useMoonlight && !s.moonlightInterest) return false
       return true
     })
-  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, effectiveEvening, useMoonlight])
+  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, useMoonlight])
+
+  // Apply the "Available only" opt-in filter on top of the base pool
+  const filtered = useMemo(() => {
+    if (!showAvailableOnly) return available
+    return available.filter((s) => !isDJUnavailableOnEvening(s.daysAvailable, effectiveEvening))
+  }, [available, showAvailableOnly, effectiveEvening])
 
   // Sort by active-context score descending
   const sorted = useMemo(() => {
-    return [...available].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const sa = useMoonlight ? (a.mlScore.avg ?? -Infinity) : (a.mainScore.avg ?? -Infinity)
       const sb = useMoonlight ? (b.mlScore.avg ?? -Infinity) : (b.mainScore.avg ?? -Infinity)
       return sb - sa
     })
-  }, [available, useMoonlight])
+  }, [filtered, useMoonlight])
 
   // Group by preference rank when a focus stage is set
   const grouped = useMemo(() => {
@@ -362,10 +369,11 @@ export function DJSelectionPanel({
     const mlScoreVal = s.mlScore.avg
     const scoreVal = useMoonlight ? mlScoreVal : mainScoreVal
     const hasPeek = scoreVal !== null
+    const isUnavailable = isDJUnavailableOnEvening(s.daysAvailable, effectiveEvening)
     return (
       <div
         key={s.submissionNumber}
-        className="dj-panel-card"
+        className={`dj-panel-card${isUnavailable ? ' dj-row--unavailable' : ''}`}
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData('application/dj-submission-number', s.submissionNumber)
@@ -377,7 +385,16 @@ export function DJSelectionPanel({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.submissionNumber) }}
         aria-label={isBrowsing ? djLabel(s) : `Assign ${djLabel(s)}`}
       >
-        <span className="dj-col-name" title={djLabel(s)}>{djLabel(s)}</span>
+        <span className="dj-col-name" title={djLabel(s)}>
+          {isUnavailable && (
+            <span
+              className="dj-unavail-icon"
+              title={`Available: ${s.daysAvailable || 'unknown'}`}
+              aria-label="Not available this day"
+            >⚠</span>
+          )}
+          {djLabel(s)}
+        </span>
         {isBrowsing ? (
           <>
             <span className="dj-col-score" title={fmt(mainScoreVal)}>{fmt(mainScoreVal)}</span>
@@ -476,22 +493,29 @@ export function DJSelectionPanel({
         />
       )}
 
-      {/* Focus-stage selector */}
-      {prefStageNames.length > 0 && (
-        <div className="dj-panel-filters">
-          <span className="filter-label">Preference:</span>
-          {prefStageNames.map((name) => (
-            <button
-              key={name}
-              type="button"
-              className={`day-btn${focusStage === name ? ' active' : ''}`}
-              onClick={() => handleFocusStage(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Focus-stage selector and availability filter */}
+      <div className="dj-panel-filters">
+        <span className="filter-label">Preference:</span>
+        {prefStageNames.map((name) => (
+          <button
+            key={name}
+            type="button"
+            className={`day-btn${focusStage === name ? ' active' : ''}`}
+            onClick={() => handleFocusStage(name)}
+          >
+            {name}
+          </button>
+        ))}
+        <span className="filter-divider" />
+        <button
+          type="button"
+          className={`day-btn${showAvailableOnly ? ' active' : ''}`}
+          onClick={() => setShowAvailableOnly((prev) => !prev)}
+          title="Show only DJs available on this day"
+        >
+          Available only
+        </button>
+      </div>
 
       {/* Column headers */}
       <div className="dj-panel-list-header">

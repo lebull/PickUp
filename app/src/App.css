@@ -2166,6 +2166,28 @@ input[type="time"] {
   cursor: grabbing;
 }
 
+.dj-panel-card.dj-row--unavailable {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.dj-panel-card.dj-row--unavailable:hover {
+  background: #1e3a5f;
+  border-color: #f59e0b;
+}
+
+.dj-unavail-icon {
+  color: #f59e0b;
+  font-size: 0.75rem;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+  cursor: help;
+}
+
+.filter-divider {
+  flex: 1;
+}
+
 .dj-col-name {
   flex: 1;
   min-width: 0;
