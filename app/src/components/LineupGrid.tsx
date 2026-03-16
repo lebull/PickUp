@@ -112,11 +112,12 @@ export function LineupGrid({
         return { positionIndex: a.positionIndex as 1 | 2 | 3, djName: getBlankLabel(a), submissionNumber: '', genre: '', isUnavailable: false, daysAvailable: '' }
       }
       const sub = submissions.find((s) => s.submissionNumber === a.submissionNumber)
+      const stageForDJ = stages.find((st) => st.id === stageId)
       return {
         positionIndex: a.positionIndex as 1 | 2 | 3,
         djName: getDisplayName(a.submissionNumber),
         submissionNumber: a.submissionNumber,
-        genre: sub?.genre ?? '',
+        genre: (stageForDJ?.useMoonlightScores ? sub?.mlGenre : sub?.genre) ?? '',
         isUnavailable: sub ? !sub.daysAvailable.toLowerCase().includes(evening.toLowerCase()) : false,
         daysAvailable: sub?.daysAvailable ?? '',
       }
@@ -363,7 +364,7 @@ export function LineupGrid({
                     const submission = assignment && !isBlankAssignment(assignment)
                       ? submissions.find((s) => s.submissionNumber === assignment.submissionNumber)
                       : undefined
-                    const genre = submission?.genre ?? ''
+                    const genre = (stage.useMoonlightScores ? submission?.mlGenre : submission?.genre) ?? ''
                     const isUnavailable = submission
                       ? !submission.daysAvailable.toLowerCase().includes(evening.toLowerCase())
                       : false

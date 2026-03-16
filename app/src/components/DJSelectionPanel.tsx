@@ -410,7 +410,7 @@ export function DJSelectionPanel({
             {fmt(scoreVal)}
           </span>
         )}
-        <span className="dj-col-genre" title={s.genre || '—'}>{s.genre || '—'}</span>
+        <span className="dj-col-genre" title={(useMoonlight ? s.mlGenre : s.genre) || '—'}>{(useMoonlight ? s.mlGenre : s.genre) || '—'}</span>
         <span className="dj-col-format" title={s.formatGear || '—'}>{s.formatGear || '—'}</span>
         {(useMoonlight || isBrowsing) && (
           <span className="dj-col-vibefit" title={s.mlVibefit || '—'}>{s.mlVibefit || '—'}</span>
