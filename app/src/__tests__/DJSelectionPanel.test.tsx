@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { DJSelectionPanel, type ActiveSlot } from '../components/DJSelectionPanel'
 import { AppPreferencesContext } from '../AppPreferencesContext'
-import type { Submission, SlotAssignment } from '../types'
+import type { Submission, SlotAssignment, Stage } from '../types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeSubmission(id: string, name: string): Submission {
+function makeSubmission(id: string, name: string, overrides: Partial<Submission> = {}): Submission {
   return {
     submissionNumber: id,
     djName: name,
@@ -17,9 +18,9 @@ function makeSubmission(id: string, name: string): Submission {
     socialMedia: '',
     phone: '',
     submissionLink: '',
-    genre: '',
+    genre: 'Techno',
     priorExperience: '',
-    formatGear: '',
+    formatGear: 'CDJs',
     bio: '',
     daysAvailable: 'Friday',
     notesForJudges: '',
@@ -47,6 +48,7 @@ function makeSubmission(id: string, name: string): Submission {
     mlNotes: '',
     mainScore: { avg: null, sum: null, partial: false },
     mlScore: { avg: null, sum: null },
+    ...overrides,
   }
 }
 
@@ -65,6 +67,17 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   )
 }
 
+const testStage: Stage = {
+  id: 'stage1',
+  name: 'Main Stage',
+  stageType: 'sequential',
+  activeDays: ['Friday'],
+  schedule: {
+    Friday: [{ startTime: '20:00', endTime: '22:00' }],
+  },
+  slotDuration: 60,
+}
+
 const activeSlot: ActiveSlot = {
   stageId: 'stage1',
   evening: 'Friday',
@@ -76,13 +89,14 @@ const activeSlot: ActiveSlot = {
 function renderPanel(
   submissions: Submission[],
   assignments: SlotAssignment[],
-  onAssign: ReturnType<typeof vi.fn>
+  onAssign: ReturnType<typeof vi.fn>,
+  stages: Stage[] = []
 ) {
   return render(
     <Wrapper>
       <DJSelectionPanel
         submissions={submissions}
-        stages={[]}
+        stages={stages}
         assignments={assignments}
         discardedSubmissionNumbers={new Set()}
         activeSlot={activeSlot}
@@ -156,5 +170,73 @@ describe('DJSelectionPanel — misclick guard', () => {
 
     expect(onAssign).toHaveBeenCalledOnce()
     expect(onAssign).toHaveBeenCalledWith('stage1', 'Friday', 0, 'S001', 0)
+  })
+})
+
+// ── 5.2: Slot tray score and format/gear display ───────────────────────────────
+
+describe('DJSelectionPanel — slot tray details', () => {
+  it('shows score and format/gear for a slotted DJ in a sequential tray row', () => {
+    const dj = makeSubmission('S001', 'DJ Alpha', {
+      formatGear: 'CDJs',
+      mainScore: { avg: 8.5, sum: 25.5, partial: false },
+      j1Technical: 8, j1Flow: 9, j1Entertainment: 8,
+    })
+    const assignment: SlotAssignment = {
+      type: 'dj',
+      stageId: 'stage1',
+      evening: 'Friday',
+      slotIndex: 0,
+      eventIndex: 0,
+      submissionNumber: 'S001',
+    }
+
+    renderPanel([dj], [assignment], vi.fn(), [testStage])
+
+    expect(screen.getByText('8.50')).toBeTruthy()
+    expect(screen.getAllByTitle('CDJs').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows — for score when the slotted DJ has no scores', () => {
+    const dj = makeSubmission('S001', 'DJ Alpha')
+    const assignment: SlotAssignment = {
+      type: 'dj',
+      stageId: 'stage1',
+      evening: 'Friday',
+      slotIndex: 0,
+      eventIndex: 0,
+      submissionNumber: 'S001',
+    }
+
+    renderPanel([dj], [assignment], vi.fn(), [testStage])
+
+    // "—" score span should be present in the tray row
+    const dashes = screen.getAllByText('—')
+    expect(dashes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows peek tooltip on hover over score in a filled sequential tray row', async () => {
+    const user = userEvent.setup()
+    const dj = makeSubmission('S001', 'DJ Alpha', {
+      formatGear: 'CDJs',
+      mainScore: { avg: 8.5, sum: 25.5, partial: false },
+      j1Technical: 8, j1Flow: 9, j1Entertainment: 8,
+    })
+    const assignment: SlotAssignment = {
+      type: 'dj',
+      stageId: 'stage1',
+      evening: 'Friday',
+      slotIndex: 0,
+      eventIndex: 0,
+      submissionNumber: 'S001',
+    }
+
+    renderPanel([dj], [assignment], vi.fn(), [testStage])
+
+    // The score span in the tray row triggers peek; tooltip should appear containing the avg
+    const scoreCells = screen.getAllByText('8.50')
+    await user.hover(scoreCells[0])
+    // Tooltip shows the peek content (avg label "Avg" + value)
+    expect(screen.getByText('Avg')).toBeTruthy()
   })
 })

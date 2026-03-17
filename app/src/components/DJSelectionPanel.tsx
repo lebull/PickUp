@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment, DJSlotAssignment } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import { getSlotLabels, formatTimeLabel } from '../lineupUtils.ts'
 import { isDJUnavailableOnEvening } from '../djAvailability.ts'
+import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
 
 export interface ActiveSlot {
   stageId: string
@@ -64,6 +65,7 @@ interface SlotTrayProps {
   submissions: Submission[]
   stageColor?: string
   timeFormat: '12h' | '24h'
+  useMoonlight: boolean
   getDisplayName: (submissionNumber: string) => string
   onAssignSequential: (slotIndex: number, submissionNumber: string) => void
   onAssignSimultaneous: (positionIndex: 1 | 2 | 3, submissionNumber: string) => void
@@ -72,6 +74,8 @@ interface SlotTrayProps {
   onBlockSequential: (slotIndex: number) => void
   onSelectPosition: (positionIndex: 1 | 2 | 3) => void
   onSelectSlot: (slotIndex: number, timeLabel: string) => void
+  onPeekEnter: (sub: Submission, rect: DOMRect) => void
+  onPeekLeave: () => void
 }
 
 function SlotTray({
@@ -81,6 +85,7 @@ function SlotTray({
   submissions,
   stageColor,
   timeFormat,
+  useMoonlight,
   getDisplayName,
   onAssignSequential,
   onAssignSimultaneous,
@@ -89,11 +94,24 @@ function SlotTray({
   onBlockSequential,
   onSelectPosition,
   onSelectSlot,
+  onPeekEnter,
+  onPeekLeave,
 }: SlotTrayProps) {
   const isSimultaneous = activeSlot.positionIndex != null
 
+  function getSubmission(submissionNumber: string): Submission | undefined {
+    return submissions.find((s) => s.submissionNumber === submissionNumber)
+  }
+
   function getGenre(submissionNumber: string): string {
-    return submissions.find((s) => s.submissionNumber === submissionNumber)?.genre || '—'
+    const sub = getSubmission(submissionNumber)
+    return (useMoonlight ? sub?.mlGenre : sub?.genre) || '—'
+  }
+
+  function getScore(submissionNumber: string): number | null {
+    const sub = getSubmission(submissionNumber)
+    if (!sub) return null
+    return useMoonlight ? sub.mlScore.avg : sub.mainScore.avg
   }
 
   if (!isSimultaneous) {
@@ -121,12 +139,28 @@ function SlotTray({
               <span className="slot-tray-time">{formatTimeLabel(label, timeFormat)}</span>
               {assignment ? (
                 <>
-                  <span className="slot-tray-dj-name">
+                  <span className="slot-tray-dj-name" title={isBlankAssignment(assignment) ? getBlankLabel(assignment) : getDisplayName(assignment.submissionNumber)}>
                     {isBlankAssignment(assignment) ? getBlankLabel(assignment) : getDisplayName(assignment.submissionNumber)}
                   </span>
-                  {!isBlankAssignment(assignment) && (
-                    <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
-                  )}
+                  {!isBlankAssignment(assignment) && (() => {
+                    const sub = getSubmission(assignment.submissionNumber)
+                    const scoreVal = getScore(assignment.submissionNumber)
+                    const canPeek = sub ? hasAnyScore(sub, useMoonlight) : false
+                    return (
+                      <>
+                        <span
+                          className="slot-tray-dj-score"
+                          title={fmt(scoreVal)}
+                          onMouseEnter={canPeek && sub ? (e) => { e.stopPropagation(); onPeekEnter(sub, e.currentTarget.getBoundingClientRect()) } : undefined}
+                          onMouseLeave={canPeek ? () => onPeekLeave() : undefined}
+                        >
+                          {fmt(scoreVal)}
+                        </span>
+                        <span className="slot-tray-dj-genre" title={getGenre(assignment.submissionNumber)}>{getGenre(assignment.submissionNumber)}</span>
+                        <span className="slot-tray-dj-gear" title={sub?.formatGear || '—'}>{sub?.formatGear || '—'}</span>
+                      </>
+                    )
+                  })()}
                   <button type="button" className="slot-tray-remove-btn" onClick={(e) => { e.stopPropagation(); onRemoveSequential(slotIdx) }}>
                     Remove
                   </button>
@@ -168,12 +202,28 @@ function SlotTray({
             <span className="slot-tray-time">Pos {pos}</span>
             {assignment ? (
               <>
-                <span className="slot-tray-dj-name">
+                <span className="slot-tray-dj-name" title={isBlankAssignment(assignment) ? getBlankLabel(assignment) : getDisplayName(assignment.submissionNumber)}>
                   {isBlankAssignment(assignment) ? getBlankLabel(assignment) : getDisplayName(assignment.submissionNumber)}
                 </span>
-                {!isBlankAssignment(assignment) && (
-                  <span className="slot-tray-dj-genre">{getGenre(assignment.submissionNumber)}</span>
-                )}
+                {!isBlankAssignment(assignment) && (() => {
+                  const sub = getSubmission(assignment.submissionNumber)
+                  const scoreVal = getScore(assignment.submissionNumber)
+                  const canPeek = sub ? hasAnyScore(sub, useMoonlight) : false
+                  return (
+                    <>
+                      <span
+                        className="slot-tray-dj-score"
+                        title={fmt(scoreVal)}
+                        onMouseEnter={canPeek && sub ? (e) => { e.stopPropagation(); onPeekEnter(sub, e.currentTarget.getBoundingClientRect()) } : undefined}
+                        onMouseLeave={canPeek ? () => onPeekLeave() : undefined}
+                      >
+                        {fmt(scoreVal)}
+                      </span>
+                      <span className="slot-tray-dj-genre" title={getGenre(assignment.submissionNumber)}>{getGenre(assignment.submissionNumber)}</span>
+                      <span className="slot-tray-dj-gear" title={sub?.formatGear || '—'}>{sub?.formatGear || '—'}</span>
+                    </>
+                  )
+                })()}
                 <button
                   type="button"
                   className="slot-tray-remove-btn"
@@ -331,45 +381,11 @@ export function DJSelectionPanel({
     return s.djName
   }
 
-  function renderPeekContent(sub: Submission): ReactNode {
-    if (useMoonlight) {
-      return (
-        <>
-          <div className="score-peek-subscores">
-            <span className="score-peek-item"><span className="score-peek-dim">Tech</span> {sub.mlTechnical ?? '—'}</span>
-            <span className="score-peek-item"><span className="score-peek-dim">Flow</span> {sub.mlFlow ?? '—'}</span>
-            <span className="score-peek-item"><span className="score-peek-dim">Ent</span> {sub.mlEntertainment ?? '—'}</span>
-          </div>
-          {sub.mlNotes && <div className="score-peek-notes">{sub.mlNotes}</div>}
-        </>
-      )
-    }
-    const judges = [
-      { label: 'J1', tech: sub.j1Technical, flow: sub.j1Flow, ent: sub.j1Entertainment, notes: sub.j1Notes },
-      { label: 'J2', tech: sub.j2Technical, flow: sub.j2Flow, ent: sub.j2Entertainment, notes: sub.j2Notes },
-      { label: 'J3', tech: sub.j3Technical, flow: sub.j3Flow, ent: sub.j3Entertainment, notes: sub.j3Notes },
-    ].filter((j) => j.tech !== null || j.flow !== null || j.ent !== null)
-    if (judges.length === 0) return null
-    return (
-      <>{judges.map((j) => (
-        <div key={j.label} className="score-peek-judge">
-          <div className="score-peek-subscores">
-            <span className="score-peek-judge-label">{j.label}</span>
-            <span className="score-peek-item"><span className="score-peek-dim">T</span> {j.tech ?? '—'}</span>
-            <span className="score-peek-item"><span className="score-peek-dim">F</span> {j.flow ?? '—'}</span>
-            <span className="score-peek-item"><span className="score-peek-dim">E</span> {j.ent ?? '—'}</span>
-          </div>
-          {j.notes && <div className="score-peek-notes">{j.notes}</div>}
-        </div>
-      ))}</>
-    )
-  }
-
   function renderCard(s: Submission) {
     const mainScoreVal = s.mainScore.avg
     const mlScoreVal = s.mlScore.avg
     const scoreVal = useMoonlight ? mlScoreVal : mainScoreVal
-    const hasPeek = scoreVal !== null
+    const hasPeek = hasAnyScore(s, useMoonlight)
     const isUnavailable = isDJUnavailableOnEvening(s.daysAvailable, effectiveEvening)
     return (
       <div
@@ -407,6 +423,7 @@ export function DJSelectionPanel({
             title={fmt(scoreVal)}
             onMouseEnter={hasPeek ? (e) => { e.stopPropagation(); setScorePeek({ sub: s, rect: e.currentTarget.getBoundingClientRect() }) } : undefined}
             onMouseLeave={hasPeek ? () => setScorePeek(null) : undefined}
+
           >
             {fmt(scoreVal)}
           </span>
@@ -491,6 +508,9 @@ export function DJSelectionPanel({
           }}
           onSelectPosition={onPositionSelect}
           onSelectSlot={onSelectSlot}
+          useMoonlight={useMoonlight}
+          onPeekEnter={(sub, rect) => setScorePeek({ sub, rect })}
+          onPeekLeave={() => setScorePeek(null)}
         />
       )}
 
@@ -563,7 +583,7 @@ export function DJSelectionPanel({
             right: `${window.innerWidth - scorePeek.rect.right}px`,
           }}
         >
-          {renderPeekContent(scorePeek.sub)}
+          {buildPeekContent(scorePeek.sub, useMoonlight)}
         </div>
       )}
     </div>

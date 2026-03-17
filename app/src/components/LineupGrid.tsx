@@ -4,6 +4,7 @@ import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
+import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
 
 interface Props {
   submissions: Submission[]
@@ -42,6 +43,7 @@ export function LineupGrid({
 }: Props) {
   const { hiddenNames, timeFormat } = useAppPreferences()
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [gridPeek, setGridPeek] = useState<{ sub: Submission; rect: DOMRect; useMoonlight: boolean } | null>(null)
 
   function getDisplayName(submissionNumber: string): string {
     const idx = submissions.findIndex((s) => s.submissionNumber === submissionNumber)
@@ -122,6 +124,10 @@ export function LineupGrid({
         daysAvailable: sub?.daysAvailable ?? '',
       }
     })
+  }
+
+  function getStageUseMoonlight(stageId: string): boolean {
+    return stages.find((s) => s.id === stageId)?.useMoonlightScores ?? false
   }
 
   function nextSimultaneousPosition(stageId: string, eventIndex: number): 1 | 2 | 3 | null {
@@ -238,6 +244,13 @@ export function LineupGrid({
                       }}
                       onMoveAssignment={onMoveAssignment}
                       onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex, evtIdx)}
+                      onPeekEnter={(subNum, rect) => {
+                        const sub = submissions.find((s) => s.submissionNumber === subNum)
+                        if (sub && hasAnyScore(sub, getStageUseMoonlight(stage.id))) {
+                          setGridPeek({ sub, rect, useMoonlight: getStageUseMoonlight(stage.id) })
+                        }
+                      }}
+                      onPeekLeave={() => setGridPeek(null)}
                       isActive={activeSlotKey === `${stage.id}|${evening}|${evtIdx}|simultaneous`}
                       gridRowStart={evtIdx + 2}
                       gridRowEnd={evtIdx + 3}
@@ -304,6 +317,13 @@ export function LineupGrid({
                               }}
                               onRemove={(positionIndex) => onRemoveSimultaneous(stage.id, evening, positionIndex, ei)}
                               onMoveAssignment={onMoveAssignment}
+                              onPeekEnter={(subNum, rect) => {
+                                const sub = submissions.find((s) => s.submissionNumber === subNum)
+                                if (sub && hasAnyScore(sub, getStageUseMoonlight(stage.id))) {
+                                  setGridPeek({ sub, rect, useMoonlight: getStageUseMoonlight(stage.id) })
+                                }
+                              }}
+                              onPeekLeave={() => setGridPeek(null)}
                               isActive={activeSlotKey === `${stage.id}|${evening}|${ei}|simultaneous`}
                               gridRowStart={gridRowStart}
                               gridRowEnd={gridRowEnd}
@@ -361,15 +381,17 @@ export function LineupGrid({
                         : getDisplayName(assignment.submissionNumber)
                       : null
                     const stageColor = stageColorMap[stage.id]
+                    const useMoonlight = getStageUseMoonlight(stage.id)
                     const submission = assignment && !isBlankAssignment(assignment)
                       ? submissions.find((s) => s.submissionNumber === assignment.submissionNumber)
                       : undefined
-                    const genre = (stage.useMoonlightScores ? submission?.mlGenre : submission?.genre) ?? ''
+                    const genre = (useMoonlight ? submission?.mlGenre : submission?.genre) ?? ''
                     const isUnavailable = submission
                       ? !submission.daysAvailable.toLowerCase().includes(evening.toLowerCase())
                       : false
                     const submissionNumber = assignment && !isBlankAssignment(assignment) ? assignment.submissionNumber : null
                     const isDragOver = dragOverKey === slotKey
+                    const canPeek = !!submission && hasAnyScore(submission, useMoonlight)
                     return assignment ? (
                       <button
                         key={`${stage.id}-${timeLabel}`}
@@ -397,6 +419,8 @@ export function LineupGrid({
                             if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
                           }
                         }}
+                        onMouseEnter={canPeek && submission ? (e) => setGridPeek({ sub: submission, rect: e.currentTarget.getBoundingClientRect(), useMoonlight }) : undefined}
+                        onMouseLeave={canPeek ? () => setGridPeek(null) : undefined}
                         onClick={() =>
                           onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
                         }
@@ -447,6 +471,18 @@ export function LineupGrid({
         </div>
       )}
 
+      {gridPeek && (
+        <div
+          className="score-peek-tooltip"
+          style={{
+            position: 'fixed',
+            bottom: `${window.innerHeight - gridPeek.rect.top + 6}px`,
+            right: `${window.innerWidth - gridPeek.rect.right}px`,
+          }}
+        >
+          {buildPeekContent(gridPeek.sub, gridPeek.useMoonlight)}
+        </div>
+      )}
     </div>
   )
 }
@@ -473,6 +509,8 @@ interface SimultaneousCellProps {
   onDrop: (submissionNumber: string) => void
   onMoveAssignment: (from: SlotCoord, to: SlotCoord) => void
   onCellClick?: () => void
+  onPeekEnter?: (submissionNumber: string, rect: DOMRect) => void
+  onPeekLeave?: () => void
   isActive?: boolean
   gridRowStart: number
   gridRowEnd: number
@@ -492,6 +530,8 @@ function SimultaneousCell({
   onDrop,
   onMoveAssignment,
   onCellClick,
+  onPeekEnter,
+  onPeekLeave,
   isActive,
   gridRowStart,
   gridRowEnd,
@@ -533,6 +573,8 @@ function SimultaneousCell({
             className={`simultaneous-dj-badge${a.isUnavailable ? ' simultaneous-dj-badge--availability-error' : ''}`}
             title={a.isUnavailable ? `Available: ${a.daysAvailable}` : undefined}
             draggable={!!a.submissionNumber}
+            onMouseEnter={a.submissionNumber && onPeekEnter ? (e) => onPeekEnter(a.submissionNumber, e.currentTarget.getBoundingClientRect()) : undefined}
+            onMouseLeave={a.submissionNumber && onPeekLeave ? () => onPeekLeave() : undefined}
             onDragStart={a.submissionNumber ? (e) => {
               e.stopPropagation()
               e.dataTransfer.setData('application/dj-slot-key', JSON.stringify({ stageId, evening, positionIndex: a.positionIndex, eventIndex }))
