@@ -314,6 +314,7 @@ export function DJSelectionPanel({
 
   function handleAssign(submissionNumber: string) {
     if (!activeSlot) return // browsing state — no slot selected
+    if (currentAssignment && !isBlankAssignment(currentAssignment)) return // slot occupied — drag-and-drop is the replace path
     if (isSimultaneous) {
       onAddSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, submissionNumber)
     } else {
