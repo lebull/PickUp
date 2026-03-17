@@ -1,7 +1,13 @@
-﻿## Requirements
+## REMOVED Requirements
+
+### Requirement: Filter list by days available
+**Reason**: The day filter is no longer needed on the submissions browser page. Day availability can still be read directly from the Days Available column. Fuzzy DJ name search (see `submission-list-search`) replaces this control area.
+**Migration**: Remove day toggle buttons and `activeDays` state from `SubmissionsView`. Remove `activeDays` prop and related filtering logic from `SubmissionList`. The filtered count label remains but now only reflects the search filter.
+
+## MODIFIED Requirements
 
 ### Requirement: Load and display submission list
-The application SHALL parse a user-supplied CSV file — imported via the CSV import button — and display all submissions in a tabular list view with the following visible columns: DJ Name (or anonymous ID when Hidden Names is active), Final Main Score, Final Moonlight Score, Genre, Preferred Stages, Days Available. When the active app context is Moonlight, a Vibefit column SHALL also be displayed. The list SHALL default to sorting by submission number ascending. The controls row SHALL display the total submission count and, when a day filter is active, the count of currently visible (filtered) submissions.
+The application SHALL parse a user-supplied CSV file — imported via the CSV import button — and display all submissions in a tabular list view with the following visible columns: DJ Name (or anonymous ID when Hidden Names is active), Final Main Score, Final Moonlight Score, Genre, Preferred Stages, Stage Assignment (when the stage-assignment toggle is on), Days Available. When the active app context is Moonlight, a Vibefit column SHALL also be displayed. The list SHALL default to sorting by submission number ascending. The controls row SHALL display the total submission count and, when a search or filter is active, the count of currently visible submissions.
 
 #### Scenario: CSV loads successfully after import
 - **WHEN** the user imports a valid scoresheet CSV via the import button
@@ -9,7 +15,7 @@ The application SHALL parse a user-supplied CSV file — imported via the CSV im
 
 #### Scenario: Missing Moonlight score
 - **WHEN** a submission has no Moonlight judge scores (ML columns are empty)
-- **THEN** the Final Moonlight Score cell displays "â€”" (em dash) rather than a number
+- **THEN** the Final Moonlight Score cell displays "—" (em dash) rather than a number
 
 #### Scenario: Preferred Stages displayed as single field
 - **WHEN** a submission has one or more stage preferences ranked
@@ -35,123 +41,6 @@ The application SHALL parse a user-supplied CSV file — imported via the CSV im
 - **WHEN** the submission list is displayed
 - **THEN** the controls row SHALL show the total number of submissions (e.g. "120 submissions")
 
-#### Scenario: Filtered count shown when day filter is active
-- **WHEN** one or more day toggles are active
+#### Scenario: Filtered count shown when search is active
+- **WHEN** the name search bar contains text that reduces the visible count
 - **THEN** the controls row SHALL show both the filtered count and the total (e.g. "34 / 120 submissions")
-
-### Requirement: Empty state before import
-The application SHALL display a prompt state â€” rather than an empty table â€” when no CSV has been imported yet.
-
-#### Scenario: Initial load shows prompt
-- **WHEN** the application first loads and no file has been imported
-- **THEN** the submission list table SHALL NOT be rendered
-- **THEN** a prompt message SHALL be displayed instructing the user to import a CSV file
-
-### Requirement: Sort list by score
-The application SHALL allow the user to sort the submission list by score by clicking column headers in the table.
-
-#### Scenario: Click score column header to sort descending
-- **WHEN** user clicks the "Main Score" or "ML Score" column header for the first time (or when that column is not the active sort)
-- **THEN** rows are sorted in descending order by that column's score value using the current score metric (avg or sum)
-- **THEN** the clicked header SHALL display a downward arrow (â–¼) indicating descending sort
-
-#### Scenario: Click active sort column header to reverse direction
-- **WHEN** user clicks the column header that is already the active sort column
-- **THEN** the sort direction SHALL toggle between descending and ascending
-- **THEN** the header arrow SHALL update to reflect the new direction (â–¼ for desc, â–² for asc)
-
-#### Scenario: Score metric dropdown changes sort value
-- **WHEN** user changes the score metric dropdown between "Average" and "Sum"
-- **THEN** the current sort column SHALL re-sort using the newly selected metric
-- **THEN** no change to sort column or direction occurs
-
-#### Scenario: Submissions with no score sort last
-- **WHEN** a submission has no scores for the active sort column
-- **THEN** it SHALL appear at the bottom of the sorted list regardless of sort direction
-
-#### Scenario: Non-score columns are not sortable
-- **WHEN** user clicks the DJ Name, Genre, Preferred Stages, or Days Available column header
-- **THEN** no sort change occurs and no arrow is displayed on that header
-
-### Requirement: Sort list by submission number
-The application SHALL allow the user to sort the submission list by submission number. Submission numbers SHALL be compared as integers (not lexicographically) when sorting.
-
-#### Scenario: Default sort is submission number ascending
-- **WHEN** the submission list is first loaded or the app context changes
-- **THEN** the active sort SHALL be submission number ascending
-- **THEN** the submission number column header SHALL display an upward arrow (▲)
-
-#### Scenario: Clicking submission number header toggles direction
-- **WHEN** the user clicks the submission number column header while it is the active sort
-- **THEN** the sort direction SHALL toggle between ascending and descending
-- **THEN** the header arrow SHALL update accordingly
-
-### Requirement: Filter list by days available
-The application SHALL allow the user to filter the submission list by one or more days using toggle buttons.
-
-#### Scenario: Toggle a day on
-- **WHEN** user clicks a day button that is not currently active (e.g., "Friday")
-- **THEN** the button becomes active (highlighted)
-- **THEN** only submissions whose Days Available field contains at least one of the currently active days are shown
-
-#### Scenario: Toggle a day off
-- **WHEN** user clicks a day button that is currently active
-- **THEN** the button becomes inactive
-- **THEN** the filter updates to reflect the remaining active days
-
-#### Scenario: No days active shows all submissions
-- **WHEN** no day buttons are active
-- **THEN** all submissions are shown regardless of availability
-
-#### Scenario: Multiple days active shows union
-- **WHEN** two or more day buttons are active (e.g., "Friday" and "Saturday")
-- **THEN** submissions available on Friday OR Saturday are shown (union, not intersection)
-
-#### Scenario: Active day buttons are visually distinct
-- **WHEN** a day button is active
-- **THEN** it SHALL have a visually distinct appearance (e.g., filled background) compared to inactive buttons
-
-### Requirement: Selecting a submission navigates to a detail route
-Clicking a submission row SHALL navigate to a URL-addressable detail view using an absolute path. The detail panel URL SHALL be `/project/:id/submissions/:djIndex` where `:djIndex` is the 0-based integer position in the original (unsorted, unfiltered) submissions array.
-
-#### Scenario: Clicking a row navigates to detail URL using absolute path
-- **WHEN** the user clicks a submission row in the list
-- **THEN** the browser SHALL navigate to the absolute path `/project/:id/submissions/:djIndex`
-- **THEN** the submission detail panel SHALL be displayed for that submission
-- **THEN** the URL SHALL NOT contain duplicate or appended path segments regardless of the previously active URL
-
-#### Scenario: Detail URL is bookmarkable
-- **WHEN** the user copies the detail URL and opens it in a new tab
-- **THEN** the submission detail panel for that index SHALL load directly
-
-#### Scenario: Browser back from detail returns to list
-- **WHEN** the user is viewing a submission detail and presses the browser back button
-- **THEN** the app SHALL return to `/project/:id/submissions` with no detail panel shown
-
-#### Scenario: Back button in detail panel navigates back
-- **WHEN** the user clicks the back/close control within the submission detail panel
-- **THEN** the app SHALL navigate back to `/project/:id/submissions`
-
-### Requirement: Fluid column layout prevents hidden content
-The submission table SHALL use a fluid column layout so that all columns â€” including the last column (Preferred Stages) â€” are always visible and never silently clipped.
-
-#### Scenario: All columns visible without horizontal clip
-- **WHEN** the submission table is rendered at any viewport width wide enough to contain the table container
-- **THEN** all table columns SHALL be visible to the user without any column being cut off or hidden
-
-#### Scenario: Table scrolls horizontally on narrow viewports
-- **WHEN** the viewport is narrower than the minimum table content width
-- **THEN** the table container SHALL scroll horizontally rather than silently hiding overflow columns
-
-### Requirement: Submission list pool view in Lineup Builder
-When the Lineup Builder mode is active, the submission list SHALL be accessible as a read-only reference panel (the "pool") showing unscheduled DJs for the currently selected evening. This is separate from the full Submission Browser tab.
-
-#### Scenario: Pool filters by evening availability and global assignment status
-- **WHEN** the organizer is viewing an evening in Lineup Builder
-- **THEN** only submissions whose days-available includes that evening are shown in the pool panel
-- **THEN** submissions already assigned to any slot anywhere in the lineup (any evening, any stage) SHALL NOT appear in the pool
-
-#### Scenario: Clicking a pool entry assigns to selected slot
-- **WHEN** a grid slot is selected (awaiting assignment) and the organizer clicks a DJ in the pool
-- **THEN** that DJ is assigned to the selected slot
-

@@ -1,65 +1,29 @@
-## Requirements
+## ADDED Requirements
 
-### Requirement: Define and configure stages
-The application SHALL allow organizers to create, edit, delete, reorder, and assign colors to stages. Each stage SHALL have: a name, a `stageType` (`"sequential"` or `"simultaneous"`), an optional display color (chosen from a fixed palette), a list of active days (subset of the convention days), a per-day schedule (start time and end time for each active day, only applicable to sequential stages), and a slot duration in minutes (only applicable to sequential stages). Stage configuration SHALL be persisted as part of the lineup data (see lineup-persistence spec).
+### Requirement: Per-stage Use Moonlight Scores configuration
+Each stage SHALL have an optional `useMoonlightScores` boolean field. When `useMoonlightScores` is `true` for a stage, the DJ selection panel for that stage SHALL sort by ML Score, show the Vibefit column, and filter the DJ list to submissions with `moonlightInterest === true`. The stage configuration panel SHALL provide a toggle for this field.
 
-#### Scenario: Add a new stage
-- **WHEN** the organizer clicks "Add Stage" in the stage configuration panel
-- **THEN** a new stage entry is created with default values (empty name, `stageType: "sequential"`, no color, no active days, no schedule)
-- **THEN** the organizer can edit the name, stage type, color, active days, per-day start/end times (sequential only), and slot duration (sequential only) inline
+#### Scenario: Stage config shows Use Moonlight Scores toggle
+- **WHEN** the organizer is editing a stage in the stage configuration panel
+- **THEN** a "Use Moonlight Scores" toggle or checkbox SHALL be visible for that stage
+- **THEN** the toggle reflects the current value of `useMoonlightScores` for the stage (default: off/false)
 
-#### Scenario: Edit an existing stage
-- **WHEN** the organizer modifies any field of an existing stage
-- **THEN** the change is reflected immediately in the stage config panel
-- **THEN** the change is saved to persistence when the organizer closes or saves the config
+#### Scenario: Enabling Use Moonlight Scores persists to the stage
+- **WHEN** the organizer enables the "Use Moonlight Scores" toggle on a stage
+- **THEN** `useMoonlightScores` SHALL be set to `true` on that stage in the project data
+- **THEN** the DJ selection panel for that stage SHALL subsequently apply Moonlight scoring and filtering
 
-#### Scenario: Delete a stage
-- **WHEN** the organizer clicks "Delete" on a stage that has no DJ assignments
-- **THEN** the stage is removed from the configuration
+#### Scenario: Disabling Use Moonlight Scores reverts to standard behavior
+- **WHEN** the organizer disables the "Use Moonlight Scores" toggle on a stage
+- **THEN** `useMoonlightScores` SHALL be set to `false` on that stage
+- **THEN** the DJ selection panel for that stage SHALL use Main Score sorting and show all available DJs regardless of `moonlightInterest`
 
-#### Scenario: Delete a stage with existing assignments
-- **WHEN** the organizer clicks "Delete" on a stage that has one or more DJ slots assigned
-- **THEN** the application SHALL display a warning listing how many slots will be lost
-- **THEN** the organizer must confirm before the stage and its assignments are deleted
+#### Scenario: Stages default to standard scoring
+- **WHEN** a new stage is created
+- **THEN** `useMoonlightScores` SHALL default to `false` (or be absent, treated as false)
+- **THEN** the toggle SHALL appear in the off state
 
-#### Scenario: Stage active days subset
-- **WHEN** an organizer assigns active days to a stage
-- **THEN** only the selected days SHALL render a column for that stage in the schedule grid
-- **THEN** per-day time inputs SHALL become visible for each checked day (sequential stages only)
-
-#### Scenario: Per-day schedule (sequential stages only)
-- **WHEN** a sequential stage is active on multiple days
-- **THEN** the organizer SHALL be able to set independent start and end times for each active day
-- **THEN** different days MAY have different start times, end times, and thus different slot counts
-
-#### Scenario: Simultaneous stage active days
-- **WHEN** the organizer assigns active days to a simultaneous stage
-- **THEN** only the selected days SHALL render a column for that stage in the schedule grid
-- **THEN** no per-day time or slot duration inputs SHALL be shown
-
-#### Scenario: Color swatch picker visible per stage
-- **WHEN** the organizer is editing a stage
-- **THEN** a row of palette color swatches SHALL be displayed for that stage (see stage-color spec)
-- **THEN** the organizer can select or clear a color for the stage
-
-#### Scenario: Drag handle visible per stage row
-- **WHEN** the organizer opens the stage configuration panel
-- **THEN** each stage row SHALL display a drag handle at its leading edge (see stage-reorder spec)
-- **THEN** the organizer can drag stages to reorder them
-
-### Requirement: Slot duration governs grid rows
-The application SHALL derive the set of time slot labels for a stage on a given evening from its per-day start time, end time, and slot duration. Slots are half-open intervals starting at `startTime` and incrementing by `slotDuration` until `endTime` is reached or exceeded.
-
-#### Scenario: Slot rows computed from config
-- **WHEN** a stage has start time 20:00, end time 24:00, and slot duration 60 minutes on Friday
-- **THEN** the grid renders 4 slot rows for that stage on Friday: 20:00, 21:00, 22:00, 23:00
-
-#### Scenario: Cross-midnight event
-- **WHEN** a stage has start time 22:00, end time 02:00 (next day), and slot duration 60 minutes
-- **THEN** the application SHALL detect that endTime < startTime in 24-hour notation and treat end time as belonging to the next calendar day
-- **THEN** the grid renders 4 slot rows: 22:00, 23:00, 00:00, 01:00
-- **THEN** the config panel SHALL display a "↷ next day" indicator when cross-midnight is detected
-
-#### Scenario: Stage with no time configuration shows placeholder
-- **WHEN** a stage has no start time, end time, or slot duration set for the selected evening
-- **THEN** the grid column for that stage SHALL display a placeholder indicating configuration is required
+#### Scenario: Multiple stages can independently have Moonlight Scores enabled
+- **WHEN** one stage has `useMoonlightScores: true` and another has `useMoonlightScores: false`
+- **THEN** the DJ selection panel for the Moonlight stage SHALL apply ML sorting and Moonlight filtering
+- **THEN** the DJ selection panel for the standard stage SHALL apply Main Score sorting and show all DJs
