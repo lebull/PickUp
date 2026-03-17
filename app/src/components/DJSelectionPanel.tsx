@@ -261,7 +261,7 @@ export function DJSelectionPanel({
 }: Props) {
   const { hiddenNames, timeFormat } = useAppPreferences()
   const [focusStage, setFocusStage] = useState<string | null>(null)
-  const [showAvailableOnly, setShowAvailableOnly] = useState(false)
+  const [showAvailableOnly, setShowAvailableOnly] = useState(true)
 
   const isBrowsing = activeSlot === null
   const isSimultaneous = activeSlot?.positionIndex != null
