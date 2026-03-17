@@ -89,7 +89,7 @@ const activeSlot: ActiveSlot = {
 function renderPanel(
   submissions: Submission[],
   assignments: SlotAssignment[],
-  onAssign: ReturnType<typeof vi.fn>,
+  onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex: number) => void,
   stages: Stage[] = []
 ) {
   return render(
