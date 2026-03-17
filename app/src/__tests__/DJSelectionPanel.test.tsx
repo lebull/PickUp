@@ -240,3 +240,47 @@ describe('DJSelectionPanel — slot tray details', () => {
     expect(screen.getByText('Avg')).toBeTruthy()
   })
 })
+
+// ── 4.1: simultaneous multi-event assign fix ───────────────────────────────────
+
+describe('DJSelectionPanel — simultaneous multi-event assign', () => {
+  it('passes eventIndex to onAddSimultaneous when clicking a DJ for a later event', () => {
+    const onAddSimultaneous = vi.fn()
+    const dj = makeSubmission('S001', 'DJ Alpha')
+
+    const simSlot: ActiveSlot = {
+      stageId: 'stage2',
+      evening: 'Friday',
+      positionIndex: 1,
+      eventIndex: 1, // second event on the same evening
+      timeLabel: '—',
+    }
+
+    render(
+      <Wrapper>
+        <DJSelectionPanel
+          submissions={[dj]}
+          stages={[]}
+          assignments={[]}
+          discardedSubmissionNumbers={new Set()}
+          activeSlot={simSlot}
+          currentEvening="Friday"
+          onAssign={vi.fn()}
+          onRemove={vi.fn()}
+          onAddSimultaneous={onAddSimultaneous}
+          onRemoveSimultaneous={vi.fn()}
+          onAssignBlank={vi.fn()}
+          onAddBlankSimultaneous={vi.fn()}
+          onPositionSelect={vi.fn()}
+          onSelectSlot={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Assign DJ Alpha' }))
+
+    expect(onAddSimultaneous).toHaveBeenCalledOnce()
+    expect(onAddSimultaneous).toHaveBeenCalledWith('stage2', 'Friday', 1, 'S001', 1)
+  })
+})

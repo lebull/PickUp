@@ -29,10 +29,10 @@ interface Props {
   currentEvening: string
   onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex: number) => void
   onRemove: (stageId: string, evening: string, slotIndex: number, eventIndex: number) => void
-  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string) => void
-  onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3) => void
+  onAddSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, submissionNumber: string, eventIndex: number) => void
+  onRemoveSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, eventIndex: number) => void
   onAssignBlank: (stageId: string, evening: string, slotIndex: number, blankLabel?: string, eventIndex?: number) => void
-  onAddBlankSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, blankLabel?: string) => void
+  onAddBlankSimultaneous: (stageId: string, evening: string, positionIndex: 1 | 2 | 3, blankLabel?: string, eventIndex?: number) => void
   onPositionSelect: (positionIndex: 1 | 2 | 3) => void
   /** Called when the user clicks a sequential slot row in the tray to change the active slot. */
   onSelectSlot: (slotIndex: number, timeLabel: string) => void
@@ -68,9 +68,9 @@ interface SlotTrayProps {
   useMoonlight: boolean
   getDisplayName: (submissionNumber: string) => string
   onAssignSequential: (slotIndex: number, submissionNumber: string) => void
-  onAssignSimultaneous: (positionIndex: 1 | 2 | 3, submissionNumber: string) => void
+  onAssignSimultaneous: (positionIndex: 1 | 2 | 3, submissionNumber: string, eventIndex: number) => void
   onRemoveSequential: (slotIndex: number) => void
-  onRemoveSimultaneous: (positionIndex: 1 | 2 | 3) => void
+  onRemoveSimultaneous: (positionIndex: 1 | 2 | 3, eventIndex: number) => void
   onBlockSequential: (slotIndex: number) => void
   onSelectPosition: (positionIndex: 1 | 2 | 3) => void
   onSelectSlot: (slotIndex: number, timeLabel: string) => void
@@ -196,7 +196,7 @@ function SlotTray({
             onDrop={!assignment ? (e) => {
               e.preventDefault()
               const subNum = e.dataTransfer.getData('application/dj-submission-number')
-              if (subNum) onAssignSimultaneous(pos, subNum)
+              if (subNum) onAssignSimultaneous(pos, subNum, activeSlot.eventIndex ?? 0)
             } : undefined}
           >
             <span className="slot-tray-time">Pos {pos}</span>
@@ -227,7 +227,7 @@ function SlotTray({
                 <button
                   type="button"
                   className="slot-tray-remove-btn"
-                  onClick={(e) => { e.stopPropagation(); onRemoveSimultaneous(pos) }}
+                  onClick={(e) => { e.stopPropagation(); onRemoveSimultaneous(pos, activeSlot.eventIndex ?? 0) }}
                 >
                   Remove
                 </button>
@@ -366,7 +366,7 @@ export function DJSelectionPanel({
     if (!activeSlot) return // browsing state — no slot selected
     if (currentAssignment && !isBlankAssignment(currentAssignment)) return // slot occupied — drag-and-drop is the replace path
     if (isSimultaneous) {
-      onAddSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, submissionNumber)
+      onAddSimultaneous(activeSlot.stageId, activeSlot.evening, activeSlot.positionIndex!, submissionNumber, activeSlot.eventIndex ?? 0)
     } else {
       onAssign(activeSlot.stageId, activeSlot.evening, activeSlot.slotIndex!, submissionNumber, activeSlot.eventIndex ?? 0)
     }
@@ -493,14 +493,14 @@ export function DJSelectionPanel({
           onAssignSequential={(slotIndex, subNum) =>
             onAssign(activeSlot!.stageId, activeSlot!.evening, slotIndex, subNum, activeSlot!.eventIndex ?? 0)
           }
-          onAssignSimultaneous={(pos, subNum) =>
-            onAddSimultaneous(activeSlot!.stageId, activeSlot!.evening, pos, subNum)
+          onAssignSimultaneous={(pos, subNum, eventIndex) =>
+            onAddSimultaneous(activeSlot!.stageId, activeSlot!.evening, pos, subNum, eventIndex)
           }
           onRemoveSequential={(slotIndex) =>
             onRemove(activeSlot!.stageId, activeSlot!.evening, slotIndex, activeSlot!.eventIndex ?? 0)
           }
-          onRemoveSimultaneous={(pos) =>
-            onRemoveSimultaneous(activeSlot!.stageId, activeSlot!.evening, pos)
+          onRemoveSimultaneous={(pos, eventIndex) =>
+            onRemoveSimultaneous(activeSlot!.stageId, activeSlot!.evening, pos, eventIndex)
           }
           onBlockSequential={(slotIndex) => {
             onAssignBlank(activeSlot!.stageId, activeSlot!.evening, slotIndex, 'Blocked', activeSlot!.eventIndex ?? 0)
