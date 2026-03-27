@@ -8,8 +8,9 @@
  */
 
 export interface LegacyStageSchedule {
-  startTime: string
-  endTime: string
+  eventType?: 'timed' | 'special'
+  startTime?: string
+  endTime?: string
   label?: string
 }
 
@@ -41,10 +42,13 @@ export function migrateProject(project: LegacyProject): LegacyProject {
     for (const [day, value] of Object.entries(stage.schedule)) {
       if (Array.isArray(value)) {
         // Already in new format — leave as-is (idempotent).
-        newSchedule[day] = value as LegacyStageSchedule[]
+        newSchedule[day] = (value as LegacyStageSchedule[]).map((event) => ({
+          ...event,
+          eventType: event.eventType ?? 'timed',
+        }))
       } else {
         // Legacy single-object form — wrap in array.
-        newSchedule[day] = [value as LegacyStageSchedule]
+        newSchedule[day] = [{ ...(value as LegacyStageSchedule), eventType: (value as LegacyStageSchedule).eventType ?? 'timed' }]
       }
     }
     return { ...stage, schedule: newSchedule }

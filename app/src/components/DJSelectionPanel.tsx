@@ -3,7 +3,7 @@ import type { Submission, Stage, SlotAssignment, DJSlotAssignment } from '../typ
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
-import { getSlotLabels, formatTimeLabel } from '../lineupUtils.ts'
+import { getSlotLabels, formatTimeLabel, getEventLabel, getStageEventType } from '../lineupUtils.ts'
 import { isDJUnavailableOnEvening } from '../djAvailability.ts'
 import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
 
@@ -76,6 +76,7 @@ interface SlotTrayProps {
   onSelectSlot: (slotIndex: number, timeLabel: string) => void
   onPeekEnter: (sub: Submission, rect: DOMRect) => void
   onPeekLeave: () => void
+  isSpecialEvent?: boolean
 }
 
 function SlotTray({
@@ -96,6 +97,7 @@ function SlotTray({
   onSelectSlot,
   onPeekEnter,
   onPeekLeave,
+  isSpecialEvent,
 }: SlotTrayProps) {
   const isSimultaneous = activeSlot.positionIndex != null
 
@@ -115,6 +117,15 @@ function SlotTray({
   }
 
   if (!isSimultaneous) {
+    if (isSpecialEvent && stageSlotLabels.length === 0) {
+      return (
+        <div className="slot-tray">
+          <div className="slot-tray-row slot-tray-row--empty">
+            <span className="slot-tray-empty">Special event picks have no fixed slots. Choose DJs from the panel to add entries.</span>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="slot-tray">
         {stageSlotLabels.map((label, slotIdx) => {
@@ -136,7 +147,7 @@ function SlotTray({
                 if (subNum) onAssignSequential(slotIdx, subNum)
               } : undefined}
             >
-              <span className="slot-tray-time">{formatTimeLabel(label, timeFormat)}</span>
+              <span className="slot-tray-time">{isSpecialEvent ? label : formatTimeLabel(label, timeFormat)}</span>
               {assignment ? (
                 <>
                   <span className="slot-tray-dj-name" title={isBlankAssignment(assignment) ? getBlankLabel(assignment) : getDisplayName(assignment.submissionNumber)}>
@@ -266,6 +277,9 @@ export function DJSelectionPanel({
   const isBrowsing = activeSlot === null
   const isSimultaneous = activeSlot?.positionIndex != null
   const stage = activeSlot ? stages.find((s) => s.id === activeSlot.stageId) : undefined
+  const activeEvent = activeSlot ? stage?.schedule?.[activeSlot.evening]?.[activeSlot.eventIndex ?? 0] : undefined
+  const isSpecialStage = stage?.stageType === 'special'
+  const isSpecialEvent = isSpecialStage || (activeEvent ? getStageEventType(activeEvent) === 'special' : false)
   const useMoonlight = !isBrowsing && (stage?.useMoonlightScores ?? false)
   const effectiveEvening = activeSlot?.evening ?? currentEvening
 
@@ -283,13 +297,14 @@ export function DJSelectionPanel({
 
   const [scorePeek, setScorePeek] = useState<{ sub: Submission; rect: DOMRect } | null>(null)
 
-  // Reset focus stage and availability filter only when the evening changes (inline state reset per React docs)
+  // Reset focus stage and availability filter when evening changes.
   const [lastEvening, setLastEvening] = useState(effectiveEvening)
-  if (effectiveEvening !== lastEvening) {
+  useEffect(() => {
+    if (effectiveEvening === lastEvening) return
     setLastEvening(effectiveEvening)
     setFocusStage(null)
     setShowAvailableOnly(false)
-  }
+  }, [effectiveEvening, lastEvening])
 
   // For sequential slots: the currently assigned DJ for this exact slot
   const currentAssignment = (isSimultaneous || !activeSlot)
@@ -301,6 +316,19 @@ export function DJSelectionPanel({
           (a.eventIndex ?? 0) === (activeSlot.eventIndex ?? 0) &&
           a.slotIndex === activeSlot.slotIndex
       )
+
+  const specialStageMaxSlotIndex = useMemo(() => {
+    if (!activeSlot || !isSpecialStage) return -1
+    return assignments
+      .filter((a) => a.stageId === activeSlot.stageId && a.slotIndex != null)
+      .reduce((max, a) => Math.max(max, a.slotIndex ?? -1), -1)
+  }, [activeSlot, assignments, isSpecialStage])
+
+  const specialStageSlotLabels = useMemo(() => {
+    if (!isSpecialStage) return []
+    const count = Math.max(1, specialStageMaxSlotIndex + 2) // assigned count + exactly one empty
+    return Array.from({ length: count }, (_, i) => `Pick ${i + 1}`)
+  }, [isSpecialStage, specialStageMaxSlotIndex])
 
   // Submissions already assigned anywhere (by submissionNumber)
   const assignedNumbers = useMemo(() =>
@@ -326,9 +354,10 @@ export function DJSelectionPanel({
 
   // Apply the "Available only" opt-in filter on top of the base pool
   const filtered = useMemo(() => {
+    if (isSpecialStage) return available
     if (!showAvailableOnly) return available
     return available.filter((s) => !isDJUnavailableOnEvening(s.daysAvailable, effectiveEvening))
-  }, [available, showAvailableOnly, effectiveEvening])
+  }, [available, showAvailableOnly, effectiveEvening, isSpecialStage])
 
   // Sort by active-context score descending
   const sorted = useMemo(() => {
@@ -453,7 +482,13 @@ export function DJSelectionPanel({
             <>
               <strong>{stage?.name ?? 'Stage'}</strong>
               <span className="dj-panel-slot-label">
-                {activeSlot!.evening}{isSimultaneous ? ' · Silent Disco' : ` · ${activeSlot!.timeLabel}`}
+                {isSpecialStage
+                  ? `Special Event${activeSlot!.slotIndex != null ? ` · Pick ${activeSlot!.slotIndex + 1}` : ''}`
+                  : `${activeSlot!.evening}${isSimultaneous
+                  ? ' · Silent Disco'
+                  : isSpecialEvent
+                    ? ` · ${getEventLabel(activeEvent ?? {}, activeSlot!.eventIndex ?? 0)}`
+                    : ` · ${activeSlot!.timeLabel}`}`}
               </span>
             </>
           )}
@@ -471,7 +506,11 @@ export function DJSelectionPanel({
       ) : (
         <SlotTray
           activeSlot={activeSlot!}
-          stageSlotLabels={stage ? getSlotLabels(stage, activeSlot!.evening, activeSlot!.eventIndex ?? 0) : []}
+          stageSlotLabels={
+            isSpecialStage
+              ? specialStageSlotLabels
+              : stage ? getSlotLabels(stage, activeSlot!.evening, activeSlot!.eventIndex ?? 0) : []
+          }
           stageAssignments={assignments.filter(
             (a) =>
               a.stageId === activeSlot!.stageId &&
@@ -511,6 +550,7 @@ export function DJSelectionPanel({
           useMoonlight={useMoonlight}
           onPeekEnter={(sub, rect) => setScorePeek({ sub, rect })}
           onPeekLeave={() => setScorePeek(null)}
+          isSpecialEvent={isSpecialEvent}
         />
       )}
 
@@ -528,14 +568,16 @@ export function DJSelectionPanel({
           </button>
         ))}
         <span className="filter-divider" />
-        <button
-          type="button"
-          className={`day-btn${showAvailableOnly ? ' active' : ''}`}
-          onClick={() => setShowAvailableOnly((prev) => !prev)}
-          title="Show only DJs available on this day"
-        >
-          Available only
-        </button>
+        {!isSpecialStage && (
+          <button
+            type="button"
+            className={`day-btn${showAvailableOnly ? ' active' : ''}`}
+            onClick={() => setShowAvailableOnly((prev) => !prev)}
+            title="Show only DJs available on this day"
+          >
+            Available only
+          </button>
+        )}
       </div>
 
       {/* Column headers */}

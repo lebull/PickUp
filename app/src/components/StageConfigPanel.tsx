@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import type { Stage, StageSchedule, SlotAssignment } from '../types.ts'
-import { CONVENTION_DAYS, getSlotLabels, getEventLabel, eventsOverlap } from '../lineupUtils.ts'
+import { CONVENTION_DAYS, getSlotLabels, getEventLabel, eventsOverlap, getStageEventType } from '../lineupUtils.ts'
 import { STAGE_COLOR_PALETTE } from '../stageColors.ts'
 
 interface Props {
@@ -21,11 +21,22 @@ function newStage(): Stage {
   }
 }
 
+function makeTimedEvent(): StageSchedule {
+  return { eventType: 'timed', startTime: '', endTime: '' }
+}
+
 /** Returns true if the given event overlaps any other event in the list (not including itself at `selfIdx`). */
 function hasOverlap(events: StageSchedule[], selfIdx: number): boolean {
+  const current = events[selfIdx]
+  if (getStageEventType(current) === 'special' || !current.startTime || !current.endTime) return false
   for (let i = 0; i < events.length; i++) {
     if (i === selfIdx) continue
-    if (eventsOverlap(events[selfIdx], events[i])) return true
+    const other = events[i]
+    if (getStageEventType(other) === 'special' || !other.startTime || !other.endTime) continue
+    if (eventsOverlap(
+      { startTime: current.startTime, endTime: current.endTime },
+      { startTime: other.startTime, endTime: other.endTime }
+    )) return true
   }
   return false
 }
@@ -35,7 +46,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
     stages.map((s) => ({
       ...s,
       schedule: Object.fromEntries(
-        Object.entries(s.schedule).map(([day, events]) => [day, events.map((e) => ({ ...e }))])
+        Object.entries(s.schedule ?? {}).map(([day, events]) => [day, events.map((e) => ({ ...e }))])
       ),
     }))
   )
@@ -52,11 +63,11 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
       prev.map((s) => {
         if (s.id !== stageId) return s
         const activeDays = checked
-          ? [...s.activeDays, day]
-          : s.activeDays.filter((d) => d !== day)
-        const schedule = { ...s.schedule }
+          ? [...(s.activeDays ?? []), day]
+          : (s.activeDays ?? []).filter((d) => d !== day)
+        const schedule = { ...(s.schedule ?? {}) }
         if (checked && (!schedule[day] || schedule[day].length === 0)) {
-          schedule[day] = [{ startTime: '', endTime: '' }]
+          schedule[day] = [makeTimedEvent()]
         }
         return { ...s, activeDays, schedule }
       })
@@ -67,15 +78,26 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
     stageId: string,
     day: string,
     eventIdx: number,
-    field: 'startTime' | 'endTime' | 'label',
+    field: 'startTime' | 'endTime' | 'label' | 'eventType',
     value: string
   ) {
     setDraft((prev) =>
       prev.map((s) => {
         if (s.id !== stageId) return s
-        const events = [...(s.schedule[day] ?? [{ startTime: '', endTime: '' }])]
-        events[eventIdx] = { ...events[eventIdx], [field]: value }
-        return { ...s, schedule: { ...s.schedule, [day]: events } }
+        const events = [...((s.schedule?.[day]) ?? [makeTimedEvent()])]
+        const nextEvent = { ...events[eventIdx] }
+        if (field === 'eventType') {
+          const eventType = value === 'special' ? 'special' : 'timed'
+          nextEvent.eventType = eventType
+          if (eventType === 'special') {
+            nextEvent.startTime = ''
+            nextEvent.endTime = ''
+          }
+        } else {
+          nextEvent[field] = value
+        }
+        events[eventIdx] = nextEvent
+        return { ...s, schedule: { ...(s.schedule ?? {}), [day]: events } }
       })
     )
   }
@@ -84,8 +106,8 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
     setDraft((prev) =>
       prev.map((s) => {
         if (s.id !== stageId) return s
-        const events = [...(s.schedule[day] ?? []), { startTime: '', endTime: '' }]
-        return { ...s, schedule: { ...s.schedule, [day]: events } }
+        const events = [...((s.schedule?.[day]) ?? []), makeTimedEvent()]
+        return { ...s, schedule: { ...(s.schedule ?? {}), [day]: events } }
       })
     )
   }
@@ -94,13 +116,13 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
     setDraft((prev) =>
       prev.map((s) => {
         if (s.id !== stageId) return s
-        const events = (s.schedule[day] ?? []).filter((_, i) => i !== eventIdx)
+        const events = ((s.schedule?.[day]) ?? []).filter((_, i) => i !== eventIdx)
         // Keep at least one empty slot when the last event is removed
         return {
           ...s,
           schedule: {
-            ...s.schedule,
-            [day]: events.length > 0 ? events : [{ startTime: '', endTime: '' }],
+            ...(s.schedule ?? {}),
+            [day]: events.length > 0 ? events : [makeTimedEvent()],
           },
         }
       })
@@ -230,12 +252,13 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                           value={stage.stageType ?? 'sequential'}
                           onChange={(e) =>
                             updateStage(stage.id, {
-                              stageType: e.target.value as 'sequential' | 'simultaneous',
+                              stageType: e.target.value as 'sequential' | 'simultaneous' | 'special',
                             })
                           }
                         >
                           <option value="sequential">Sequential</option>
                           <option value="simultaneous">Simultaneous</option>
+                          <option value="special">Special</option>
                         </select>
                       </div>
                       {(stage.stageType ?? 'sequential') === 'sequential' && (
@@ -244,7 +267,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                           <input
                             type="number"
                             className="slot-duration-input"
-                            value={stage.slotDuration}
+                            value={stage.slotDuration ?? 60}
                             min={15}
                             step={15}
                             onChange={(e) =>
@@ -263,11 +286,24 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                       </label>
                     </div>
 
-                    <div className="stage-days-section">
-                      <span className="stage-field-label">Schedule by day</span>
+                    {(stage.stageType ?? 'sequential') === 'special' && (
+                      <div className="stage-days-section">
+                        <span className="stage-field-label">Special event setup</span>
+                        <p className="stage-helper-text">
+                          Special stages are not day-bound and use open-ended picks.
+                        </p>
+                      </div>
+                    )}
+
+                    {(stage.stageType ?? 'sequential') !== 'special' && (
+                      <div className="stage-days-section">
+                        <span className="stage-field-label">Schedule by day</span>
+                        <p className="stage-helper-text">
+                          Enable a day, then set each event row Event Type to Timed Event or Special Event.
+                        </p>
                       {CONVENTION_DAYS.map((day) => {
-                        const isActive = stage.activeDays.includes(day)
-                        const events = isActive ? (stage.schedule[day] ?? [{ startTime: '', endTime: '' }]) : []
+                        const isActive = (stage.activeDays ?? []).includes(day)
+                        const events = isActive ? ((stage.schedule?.[day]) ?? [makeTimedEvent()]) : []
 
                         return (
                           <div key={day} className={`day-schedule-row${isActive ? ' day-schedule-row--active' : ''}`}>
@@ -282,11 +318,13 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                             {isActive && (
                               <div className="day-events-list">
                                 {events.map((event, evtIdx) => {
+                                  const eventType = getStageEventType(event)
                                   const crossesMidnight =
+                                    eventType !== 'special' &&
                                     event.startTime &&
                                     event.endTime &&
                                     event.endTime <= event.startTime
-                                  const overlap = hasOverlap(events, evtIdx)
+                                  const overlap = eventType !== 'special' && hasOverlap(events, evtIdx)
                                   const labels = (stage.stageType ?? 'sequential') === 'sequential'
                                     ? getSlotLabels(stage, day, evtIdx)
                                     : []
@@ -297,26 +335,41 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                                           {getEventLabel(event, evtIdx)}
                                         </span>
                                       )}
-                                      <input
-                                        type="time"
-                                        value={event.startTime}
+                                      <select
+                                        className="stage-type-select"
+                                        value={eventType}
                                         onChange={(e) =>
-                                          updateEventField(stage.id, day, evtIdx, 'startTime', e.target.value)
+                                          updateEventField(stage.id, day, evtIdx, 'eventType', e.target.value)
                                         }
-                                      />
-                                      <span className="stage-field-label">–</span>
-                                      <input
-                                        type="time"
-                                        value={event.endTime}
-                                        onChange={(e) =>
-                                          updateEventField(stage.id, day, evtIdx, 'endTime', e.target.value)
-                                        }
-                                      />
+                                        aria-label="Event Type"
+                                      >
+                                        <option value="timed">Timed Event</option>
+                                        <option value="special">Special Event</option>
+                                      </select>
+                                      {eventType !== 'special' && (
+                                        <>
+                                          <input
+                                            type="time"
+                                            value={event.startTime ?? ''}
+                                            onChange={(e) =>
+                                              updateEventField(stage.id, day, evtIdx, 'startTime', e.target.value)
+                                            }
+                                          />
+                                          <span className="stage-field-label">–</span>
+                                          <input
+                                            type="time"
+                                            value={event.endTime ?? ''}
+                                            onChange={(e) =>
+                                              updateEventField(stage.id, day, evtIdx, 'endTime', e.target.value)
+                                            }
+                                          />
+                                        </>
+                                      )}
                                       <input
                                         type="text"
                                         className="event-label-input"
                                         value={event.label ?? ''}
-                                        placeholder="Label (e.g. Evening Set)"
+                                        placeholder={eventType === 'special' ? 'Label (e.g. VIP Showcase)' : 'Label (e.g. Evening Set)'}
                                         onChange={(e) =>
                                           updateEventField(stage.id, day, evtIdx, 'label', e.target.value)
                                         }
@@ -328,6 +381,9 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                                         <span className="slot-count-hint">
                                           {labels.length} slot{labels.length !== 1 ? 's' : ''}
                                         </span>
+                                      )}
+                                      {eventType === 'special' && (
+                                        <span className="slot-count-hint">Special event (no fixed slot count)</span>
                                       )}
                                       {events.length > 1 && (
                                         <button
@@ -358,6 +414,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                         )
                       })}
                     </div>
+                    )}
 
                     <div className="stage-color-swatches">
                       <span className="stage-field-label">Color</span>

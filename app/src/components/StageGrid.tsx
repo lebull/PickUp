@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, formatTimeLabel, timeToMinutes } from '../lineupUtils.ts'
+import { getSlotLabels, formatTimeLabel, timeToMinutes, getStageEventType } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
@@ -41,6 +41,10 @@ export function StageGrid({
   const stage = stages.find((s) => s.id === activeStageId)
   const isSimultaneous = stage?.stageType === 'simultaneous'
 
+  function getTimedEvents(day: string) {
+    return (stage?.schedule?.[day] ?? []).filter((event) => getStageEventType(event) !== 'special')
+  }
+
   function getDisplayName(submissionNumber: string): string {
     const idx = submissions.findIndex((s) => s.submissionNumber === submissionNumber)
     if (hiddenNames) return idx >= 0 ? `DJ #${idx + 1}` : submissionNumber
@@ -50,7 +54,7 @@ export function StageGrid({
   // Active days for this stage in convention order
   const activeDays = useMemo(() => {
     if (!stage) return []
-    return CONVENTION_ORDER.filter((d) => stage.activeDays.includes(d))
+    return CONVENTION_ORDER.filter((d) => (stage.activeDays ?? []).includes(d))
   }, [stage])
 
   // Unified time slot row axis across all active days (union, sorted chronologically)
@@ -114,7 +118,7 @@ export function StageGrid({
 
   // For simultaneous stages: compute event rows to render (one per event index)
   const simEventCount = isSimultaneous
-    ? Math.max(1, ...activeDays.map((day) => (stage.schedule?.[day] ?? []).length))
+    ? Math.max(1, ...activeDays.map((day) => getTimedEvents(day).length))
     : 0
   const simEventIndices = isSimultaneous ? Array.from({ length: simEventCount }, (_, i) => i) : []
 
@@ -141,8 +145,8 @@ export function StageGrid({
         {/* Body */}
         {isSimultaneous ? simEventIndices.map((ei) => {
           // Row time label: use the first active day that has this event
-          const firstDayWithEvent = activeDays.find((d) => (stage.schedule?.[d] ?? []).length > ei)
-          const firstEvent = firstDayWithEvent ? stage.schedule?.[firstDayWithEvent]?.[ei] : undefined
+          const firstDayWithEvent = activeDays.find((d) => getTimedEvents(d).length > ei)
+          const firstEvent = firstDayWithEvent ? getTimedEvents(firstDayWithEvent)[ei] : undefined
           const rowLabel = firstEvent?.startTime
             ? formatTimeLabel(firstEvent.startTime, timeFormat)
             : `Set ${ei + 1}`
@@ -150,7 +154,7 @@ export function StageGrid({
             <>
               <div key={`sim-time-${ei}`} className="grid-cell grid-time-label">{rowLabel}</div>
               {activeDays.map((day) => {
-                const dayEvents = stage.schedule?.[day] ?? []
+                const dayEvents = getTimedEvents(day)
                 if (ei >= dayEvents.length && dayEvents.length > 0) {
                   return <div key={`sim-${day}-oor-${ei}`} className="grid-cell grid-slot grid-slot--out-of-range" />
                 }

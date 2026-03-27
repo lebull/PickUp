@@ -284,3 +284,50 @@ describe('DJSelectionPanel — simultaneous multi-event assign', () => {
     expect(onAddSimultaneous).toHaveBeenCalledWith('stage2', 'Friday', 1, 'S001', 1)
   })
 })
+
+describe('DJSelectionPanel — special event list behavior', () => {
+  it('does not apply day availability filtering for special stages', () => {
+    const specialStage: Stage = {
+      id: 'special-1',
+      name: 'VIP Showcase',
+      stageType: 'special',
+    }
+
+    const specialSlot: ActiveSlot = {
+      stageId: 'special-1',
+      evening: '',
+      slotIndex: 0,
+      eventIndex: 0,
+      timeLabel: 'Pick 1',
+    }
+
+    const fridayDJ = makeSubmission('S101', 'DJ Friday', { daysAvailable: 'Friday' })
+    const saturdayDJ = makeSubmission('S102', 'DJ Saturday', { daysAvailable: 'Saturday' })
+
+    render(
+      <Wrapper>
+        <DJSelectionPanel
+          submissions={[fridayDJ, saturdayDJ]}
+          stages={[specialStage]}
+          assignments={[]}
+          discardedSubmissionNumbers={new Set()}
+          activeSlot={specialSlot}
+          currentEvening="Friday"
+          onAssign={vi.fn()}
+          onRemove={vi.fn()}
+          onAddSimultaneous={vi.fn()}
+          onRemoveSimultaneous={vi.fn()}
+          onAssignBlank={vi.fn()}
+          onAddBlankSimultaneous={vi.fn()}
+          onPositionSelect={vi.fn()}
+          onSelectSlot={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    expect(screen.queryByRole('button', { name: 'Available only' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Assign DJ Friday' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Assign DJ Saturday' })).toBeTruthy()
+  })
+})

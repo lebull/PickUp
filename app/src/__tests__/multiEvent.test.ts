@@ -150,6 +150,25 @@ describe('migrateProject', () => {
     expect(result.stages[0].schedule['Friday']).toHaveLength(1)
     expect(result.assignments[0].eventIndex).toBe(0)
   })
+
+  it('defaults migrated events to eventType: timed when not present', () => {
+    const input = {
+      stages: [
+        {
+          id: 's1',
+          name: 'Main',
+          schedule: {
+            Friday: { startTime: '20:00', endTime: '24:00' },
+          },
+        },
+      ],
+      assignments: [],
+    }
+
+    const result = migrateProject(input as Parameters<typeof migrateProject>[0])
+    const friday = result.stages[0].schedule['Friday'] as LegacyStageSchedule[]
+    expect(friday[0].eventType).toBe('timed')
+  })
 })
 
 // ── 6.3: eventsOverlap ────────────────────────────────────────────────────────

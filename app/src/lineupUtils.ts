@@ -1,6 +1,10 @@
 import type { Stage } from './types.ts'
 import type { TimeFormat } from './AppPreferencesContext.ts'
 
+export function getStageEventType(event: { eventType?: 'timed' | 'special' }): 'timed' | 'special' {
+  return event.eventType ?? 'timed'
+}
+
 /** Convention days in display order. */
 export const CONVENTION_DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday'] as const
 
@@ -46,7 +50,8 @@ export function getSlotLabels(stage: Stage, evening: string, eventIndex = 0): st
   const events = stage.schedule?.[evening]
   if (!events || events.length === 0) return []
   const daySchedule = events[eventIndex]
-  if (!daySchedule?.startTime || !daySchedule?.endTime || !stage.slotDuration) return []
+  if (!daySchedule || getStageEventType(daySchedule) === 'special') return []
+  if (!daySchedule.startTime || !daySchedule.endTime || !stage.slotDuration) return []
 
   const startMinutes = timeToMinutes(daySchedule.startTime)
   let endMinutes = timeToMinutes(daySchedule.endTime)
@@ -84,7 +89,7 @@ export function getEventLabel(event: { label?: string }, index: number): string 
  */
 export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
   const sequentialStages = stages.filter(
-    (s) => s.stageType !== 'simultaneous' && s.activeDays.includes(evening)
+    (s) => s.stageType !== 'simultaneous' && (s.activeDays ?? []).includes(evening)
   )
   if (sequentialStages.length === 0) return []
 
@@ -97,6 +102,7 @@ export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
     if (!events || events.length === 0 || !stage.slotDuration) continue
 
     for (const event of events) {
+      if (getStageEventType(event) === 'special') continue
       if (!event.startTime || !event.endTime) continue
 
       const startM = timeToMinutes(event.startTime)
@@ -116,11 +122,12 @@ export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
   // their start/end times onto the correct grid rows even when they fall outside the
   // sequential stage range (e.g. a silent disco running 1pm–3pm before DJs start at 3pm).
   for (const stage of stages) {
-    if (stage.stageType !== 'simultaneous' || !stage.activeDays.includes(evening)) continue
+    if (stage.stageType !== 'simultaneous' || !(stage.activeDays ?? []).includes(evening)) continue
     const events = stage.schedule?.[evening]
     if (!events || events.length === 0) continue
     // Simultaneous stages only use the first event for time-axis bounds
     const event = events[0]
+    if (event && getStageEventType(event) === 'special') continue
     if (!event?.startTime || !event?.endTime) continue
 
     const startM = timeToMinutes(event.startTime)

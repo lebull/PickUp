@@ -1,8 +1,10 @@
 import type { MainScore, MLScore } from './scoreCalculation.ts'
 
 export interface StageSchedule {
-  startTime: string   // "HH:MM" 24-hour
-  endTime: string     // "HH:MM" 24-hour (may be earlier than startTime for cross-midnight events)
+  /** Defaults to 'timed' when omitted. Special events are unscheduled pick lists. */
+  eventType?: 'timed' | 'special'
+  startTime?: string   // "HH:MM" 24-hour
+  endTime?: string     // "HH:MM" 24-hour (may be earlier than startTime for cross-midnight events)
   /** Optional human-readable label for this event block (e.g. "Afternoon Set"). */
   label?: string
 }
@@ -10,12 +12,14 @@ export interface StageSchedule {
 export interface Stage {
   id: string
   name: string
-  /** Whether DJs play sequentially in time slots or simultaneously for the whole event. Defaults to "sequential". */
-  stageType: 'sequential' | 'simultaneous'
-  activeDays: string[]
-  /** Per-day event schedule. Key is the day name (e.g. "Friday"). Each day holds one or more timed event blocks. Only used for sequential stages. */
-  schedule: Record<string, StageSchedule[]>
-  slotDuration: number // minutes (sequential stages only)
+  /** Stage type: 'sequential' (time-slot based), 'simultaneous' (concurrent 3-DJ), or 'special' (open-ended pick list). */
+  stageType: 'sequential' | 'simultaneous' | 'special'
+  /** Active convention days. Required for sequential/simultaneous stages; omitted for special stages. */
+  activeDays?: string[]
+  /** Per-day event schedule. Key is the day name (e.g. "Friday"). Each day holds one or more timed event blocks. Only used for sequential/simultaneous stages. */
+  schedule?: Record<string, StageSchedule[]>
+  /** Slot duration in minutes. Required for sequential stages; omitted for simultaneous/special stages. */
+  slotDuration?: number
   /** Optional display color as a hex string (e.g. "#6366f1"). Chosen from the curated stage color palette. */
   color?: string
   /** When true, this stage uses ML scores for sorting and Moonlight-interest filtering in the DJ selection panel. */
@@ -43,13 +47,43 @@ export interface BlankSlotAssignment extends SlotAssignmentBase {
   blankLabel?: string
 }
 
+export interface SpecialDJAssignment {
+  type: 'dj'
+  stageId: string
+  submissionNumber: string
+}
+
+export interface SpecialBlankAssignment {
+  type: 'blank'
+  stageId: string
+  blankLabel?: string
+}
+
 export type SlotAssignment = DJSlotAssignment | BlankSlotAssignment
+export type SpecialAssignment = SpecialDJAssignment | SpecialBlankAssignment
+export type Assignment = SlotAssignment | SpecialAssignment
 
 export function isBlankAssignment(a: SlotAssignment): a is BlankSlotAssignment {
   return a.type === 'blank'
 }
 
 export function getBlankLabel(a: BlankSlotAssignment): string {
+  return a.blankLabel || 'Blocked'
+}
+
+export function isSlotAssignment(a: Assignment): a is SlotAssignment {
+  return 'evening' in a
+}
+
+export function isSpecialAssignment(a: Assignment): a is SpecialAssignment {
+  return !('evening' in a) && 'stageId' in a
+}
+
+export function isSpecialBlankAssignment(a: SpecialAssignment): a is SpecialBlankAssignment {
+  return a.type === 'blank'
+}
+
+export function getSpecialBlankLabel(a: SpecialBlankAssignment): string {
   return a.blankLabel || 'Blocked'
 }
 
@@ -64,7 +98,7 @@ export function isSimultaneousCoord(c: SlotCoord): c is { stageId: string; eveni
 
 export interface LineupState {
   stages: Stage[]
-  assignments: SlotAssignment[]
+  assignments: Assignment[]
   rowCount: number
 }
 
@@ -73,7 +107,7 @@ export interface Project {
   name: string
   csvText: string
   stages: Stage[]
-  assignments: SlotAssignment[]
+  assignments: Assignment[]
   discardedSubmissions: string[]
   rowCount: number
   createdAt: string  // ISO timestamp

@@ -6,6 +6,7 @@ import type { SortField, SortDir, ScoreMetric } from './SubmissionList.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { SplitPane } from './SplitPane.tsx'
+import { isSlotAssignment } from '../types.ts'
 function SubmissionDetailRoute() {
   const { djIndex } = useParams<{ djIndex: string }>()
   const { submissions } = useProjectContext()
@@ -73,7 +74,7 @@ export function SubmissionsView() {
         <SubmissionList
           submissions={submissions}
           stages={project.stages}
-          assignments={project.assignments}
+          assignments={project.assignments.filter(isSlotAssignment)}
           sortField={sortField}
           sortDir={sortDir}
           scoreMetric={scoreMetric}

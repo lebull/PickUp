@@ -44,7 +44,7 @@ describe('formatTimeLabel', () => {
 
 function makeSequentialStage(
   id: string,
-  events: { startTime: string; endTime: string; label?: string }[]
+  events: { eventType?: 'timed' | 'special'; startTime?: string; endTime?: string; label?: string }[]
 ): Stage {
   return {
     id,
@@ -85,6 +85,15 @@ describe('getEveningTimeAxis – multi-event stages', () => {
   it('getSlotLabels returns empty array for out-of-range eventIndex', () => {
     const stage = makeSequentialStage('disco', [{ startTime: '20:00', endTime: '22:00' }])
     expect(getSlotLabels(stage, 'Friday', 5)).toEqual([])
+  })
+
+  it('getSlotLabels returns empty for special events with no time windows', () => {
+    const stage = makeSequentialStage('disco', [
+      { eventType: 'special', label: 'VIP Showcase' },
+      { startTime: '20:00', endTime: '22:00' },
+    ])
+    expect(getSlotLabels(stage, 'Friday', 0)).toEqual([])
+    expect(getSlotLabels(stage, 'Friday', 1)).toEqual(['20:00', '21:00'])
   })
 
   it('single-event stage behaves identically to before', () => {
