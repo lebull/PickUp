@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel } from '../lineupUtils.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventType } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
@@ -54,7 +54,7 @@ export function LineupGrid({
   const activeEvenings = useMemo(() => {
     const daySet = new Set<string>()
     for (const stage of stages) {
-      for (const day of stage.activeDays) daySet.add(day)
+      for (const day of stage.activeDays ?? []) daySet.add(day)
     }
     return ['Thursday', 'Friday', 'Saturday', 'Sunday'].filter((d) => daySet.has(d))
   }, [stages])
@@ -64,7 +64,7 @@ export function LineupGrid({
     : activeEvenings[0] ?? ''
 
   const eveningStages = useMemo(
-    () => stages.filter((s) => s.activeDays.includes(evening)),
+    () => stages.filter((s) => (s.activeDays ?? []).includes(evening)),
     [stages, evening]
   )
 
@@ -91,6 +91,10 @@ export function LineupGrid({
     for (const s of stages) map[s.id] = s.color
     return map
   }, [stages])
+
+  function getTimedEvents(stage: Stage, day: string) {
+    return (stage.schedule?.[day] ?? []).filter((event) => getStageEventType(event) !== 'special')
+  }
 
   function getAssignment(stageId: string, eventIndex: number, slotIndex: number): SlotAssignment | undefined {
     return assignments.find(
@@ -205,7 +209,7 @@ export function LineupGrid({
             const maxEvents = Math.max(
               ...eveningStages
                 .filter((s) => s.stageType === 'simultaneous')
-                .map((s) => Math.max((s.schedule?.[evening] ?? []).length, 1))
+                .map((s) => Math.max(getTimedEvents(s, evening).length, 1))
             )
             return Array.from({ length: maxEvents }, (_, evtIdx) => (
               <>
@@ -218,7 +222,7 @@ export function LineupGrid({
                       </div>
                     ) : <div key={`${stage.id}-blank-${evtIdx}`} className="grid-cell grid-slot grid-slot--out-of-range" />
                   }
-                  const stageEvents = stage.schedule?.[evening] ?? []
+                  const stageEvents = getTimedEvents(stage, evening)
                   if (evtIdx >= stageEvents.length && stageEvents.length > 0) {
                     return <div key={`${stage.id}-blank-${evtIdx}`} className="grid-cell grid-slot grid-slot--out-of-range" />
                   }
@@ -289,7 +293,7 @@ export function LineupGrid({
 
                     // Simultaneous stages: each event spans its own time range within the column.
                     if (stage.stageType === 'simultaneous') {
-                      const dayEvents = stage.schedule?.[evening] ?? []
+                      const dayEvents = getTimedEvents(stage, evening)
                       const eventCount = Math.max(dayEvents.length, 1)
                       for (let ei = 0; ei < eventCount; ei++) {
                         const { gridRowStart, gridRowEnd } = getSimultaneousRowRange(stage, evening, timeAxis, ei)

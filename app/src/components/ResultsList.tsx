@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useProjectContext } from '../ProjectContext.ts'
-import type { Submission, BlankSlotAssignment, Stage } from '../types.ts'
-import { isBlankAssignment, getBlankLabel } from '../types.ts'
+import type { Submission, BlankSlotAssignment, Stage, SlotAssignment, DJSlotAssignment } from '../types.ts'
+import { isBlankAssignment, getBlankLabel, isSlotAssignment } from '../types.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
-import { getSlotLabels } from '../lineupUtils.ts'
+import { useAppPreferences } from '../AppPreferencesContext.ts'
+import { getEventLabel, getSlotLabels, getStageEventType } from '../lineupUtils.ts'
 
 // ── Data helpers ─────────────────────────────────────────────────────────────
 
@@ -36,16 +37,32 @@ interface DuplicateAlertEntry {
   telegramDiscord: string
 }
 
+interface SpecialEventSection {
+  key: string
+  label: string
+  rows: DJRow[]
+}
+
 function buildResultsData(
   submissions: Submission[],
   project: import('../types.ts').Project
 ) {
   const { assignments, stages, discardedSubmissions } = project
   const discardedSet = new Set(discardedSubmissions ?? [])
+  const stageById = new Map(stages.map((stage) => [stage.id, stage]))
+
+  // Filter to only slot assignments (exclude special stage assignments for now)
+  const slotAssignments = assignments.filter(isSlotAssignment) as SlotAssignment[]
+
+  function isSpecialEventAssignment(a: SlotAssignment): boolean {
+    const stage = stageById.get(a.stageId)
+    const event = stage?.schedule?.[a.evening]?.[a.eventIndex ?? 0]
+    return !!event && getStageEventType(event) === 'special'
+  }
 
   // Only DJ assignments count toward "assigned" submission numbers
   const assignedNumbers = new Set<string>()
-  for (const a of assignments) {
+  for (const a of slotAssignments) {
     if (!isBlankAssignment(a)) assignedNumbers.add(a.submissionNumber)
   }
 
@@ -74,8 +91,9 @@ function buildResultsData(
   // Accepted: per stage, collect assigned submissions and blank slots in slot order
   const acceptedByStage: Array<{ stageId: string; stageName: string; rows: ResultRow[] }> = []
   for (const stage of stages) {
-    const stageAssignments = assignments
-      .filter((a) => a.stageId === stage.id)
+    if (stage.stageType === 'special') continue
+    const stageAssignments = slotAssignments
+      .filter((a) => a.stageId === stage.id && !isSpecialEventAssignment(a))
       .sort((a, b) => {
         if (a.evening !== b.evening) return a.evening < b.evening ? -1 : 1
         const si = (a.slotIndex ?? 0) - (b.slotIndex ?? 0)
@@ -93,6 +111,59 @@ function buildResultsData(
     }
     if (rows.length > 0) {
       acceptedByStage.push({ stageId: stage.id, stageName: stage.name, rows })
+    }
+  }
+
+  const specialEventSections: SpecialEventSection[] = []
+  for (const stage of stages) {
+    if (stage.stageType === 'special') {
+      const rows: DJRow[] = slotAssignments
+        .filter((a): a is DJSlotAssignment => a.stageId === stage.id && !isBlankAssignment(a))
+        .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
+        .map((a) => {
+          const submission = subByNumber.get(a.submissionNumber)
+          return submission ? { submission } : null
+        })
+        .filter((row): row is DJRow => row !== null)
+      if (rows.length > 0) {
+        specialEventSections.push({
+          key: stage.id,
+          label: stage.name,
+          rows,
+        })
+      }
+      continue
+    }
+
+    const byEvent = new Map<number, SlotAssignment[]>()
+    for (const assignment of slotAssignments) {
+      if (assignment.stageId !== stage.id) continue
+      if (!isSpecialEventAssignment(assignment)) continue
+      const eventIndex = assignment.eventIndex ?? 0
+      const bucket = byEvent.get(eventIndex) ?? []
+      bucket.push(assignment)
+      byEvent.set(eventIndex, bucket)
+    }
+    for (const [eventIndex, eventAssignments] of byEvent.entries()) {
+      if (eventAssignments.length === 0) continue
+      const evening = eventAssignments[0].evening
+      const event = stage.schedule?.[evening]?.[eventIndex]
+      const label = `${stage.name} · ${evening} · ${event ? getEventLabel(event, eventIndex) : `Special Event ${eventIndex + 1}`}`
+      const rows: DJRow[] = eventAssignments
+        .filter((a): a is DJSlotAssignment => !isBlankAssignment(a))
+        .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
+        .map((a) => {
+          const submission = subByNumber.get(a.submissionNumber)
+          return submission ? { submission } : null
+        })
+        .filter((row): row is DJRow => row !== null)
+      if (rows.length > 0) {
+        specialEventSections.push({
+          key: `${stage.id}|${evening}|${eventIndex}`,
+          label,
+          rows,
+        })
+      }
     }
   }
 
@@ -126,7 +197,7 @@ function buildResultsData(
   }
   const totalDjCount = [...djCountByStage.values()].reduce((a, b) => a + b, 0)
 
-  return { acceptedByStage, rejectionList, duplicateAlerts, assignedNumbers, djCountByStage, totalDjCount }
+  return { acceptedByStage, rejectionList, specialEventSections, duplicateAlerts, assignedNumbers, djCountByStage, totalDjCount }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -152,11 +223,12 @@ function CopyIcon() {
 
 interface DJRowItemProps {
   row: DJRow
+  displayName: string
   isSelected: boolean
   onClick: (sub: Submission) => void
 }
 
-function DJRowItem({ row, isSelected, onClick }: DJRowItemProps) {
+function DJRowItem({ row, displayName, isSelected, onClick }: DJRowItemProps) {
   const { submission: s } = row
   const [emailCopied, setEmailCopied] = useState(false)
   const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard
@@ -167,7 +239,7 @@ function DJRowItem({ row, isSelected, onClick }: DJRowItemProps) {
       onClick={() => onClick(s)}
       type="button"
     >
-      <span className="results-dj-name">{s.djName}</span>
+      <span className="results-dj-name">{displayName}</span>
       <span className="results-dj-contact">
         {s.contactEmail && (
           <span className="results-contact-row">
@@ -274,13 +346,15 @@ function EmailModal({ label, emails, onClose }: EmailModalProps) {
 
 export function ResultsList() {
   const { project, submissions } = useProjectContext()
+  const { hiddenNames } = useAppPreferences()
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
   const [emailModal, setEmailModal] = useState<{ label: string; emails: string } | null>(null)
 
   if (!submissions) return null
+  const allSubmissions = submissions
 
-  const { acceptedByStage, rejectionList, duplicateAlerts, djCountByStage, totalDjCount } =
-    buildResultsData(submissions, project)
+  const { acceptedByStage, rejectionList, specialEventSections, duplicateAlerts, djCountByStage, totalDjCount } =
+    buildResultsData(allSubmissions, project)
 
   const hasSelection = selectedSubmission !== null
 
@@ -292,6 +366,12 @@ export function ResultsList() {
 
   function handleCloseDetail() {
     setSelectedSubmission(null)
+  }
+
+  function getDisplayName(sub: Submission): string {
+    if (!hiddenNames) return sub.djName
+    const idx = allSubmissions.findIndex((s) => s.submissionNumber === sub.submissionNumber)
+    return idx >= 0 ? `DJ #${idx + 1}` : sub.djName
   }
 
   function handleOpenEmailModal(label: string, rows: ResultRow[]) {
@@ -371,6 +451,7 @@ export function ResultsList() {
                       <DJRowItem
                         key={row.submission.submissionNumber}
                         row={row}
+                        displayName={getDisplayName(row.submission)}
                         isSelected={selectedSubmission?.submissionNumber === row.submission.submissionNumber}
                         onClick={handleSelectDJ}
                       />
@@ -403,11 +484,45 @@ export function ResultsList() {
               <DJRowItem
                 key={s.submissionNumber}
                 row={{ submission: s }}
+                displayName={getDisplayName(s)}
                 isSelected={selectedSubmission?.submissionNumber === s.submissionNumber}
                 onClick={handleSelectDJ}
               />
             ))}
           </div>
+        </section>
+      )}
+
+      {specialEventSections.length > 0 && (
+        <section className="results-stage-section results-special-events-section">
+          <div className="results-stage-heading-row">
+            <h2 className="results-stage-heading">Special Events</h2>
+          </div>
+          {specialEventSections.map((section) => (
+            <section key={section.key} className="results-stage-section">
+              <div className="results-stage-heading-row">
+                <h3 className="results-stage-heading">{section.label}</h3>
+                <button
+                  type="button"
+                  className="results-copy-stage-btn"
+                  onClick={() => handleOpenEmailModal(section.label, section.rows)}
+                >
+                  Copy emails
+                </button>
+              </div>
+              <div className="results-dj-list">
+                {section.rows.map((row) => (
+                  <DJRowItem
+                    key={`${section.key}|${row.submission.submissionNumber}`}
+                    row={row}
+                    displayName={getDisplayName(row.submission)}
+                    isSelected={selectedSubmission?.submissionNumber === row.submission.submissionNumber}
+                    onClick={handleSelectDJ}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
         </section>
       )}
     </div>

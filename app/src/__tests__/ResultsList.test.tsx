@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { ProjectContext } from '../ProjectContext'
 import { ResultsList } from '../components/ResultsList'
+import { AppPreferencesContext } from '../AppPreferencesContext'
 import type { Project, Stage, Submission } from '../types'
 
 function makeSubmission(id: string, name: string, overrides: Partial<Submission> = {}): Submission {
@@ -82,21 +83,30 @@ function makeProject(): Project {
   }
 }
 
-function renderResults(project: Project, submissions: Submission[]) {
+function renderResults(project: Project, submissions: Submission[], hiddenNames = false) {
   return render(
-    <ProjectContext.Provider
+    <AppPreferencesContext.Provider
       value={{
-        project,
-        setProject: vi.fn(),
-        submissions,
-        setSubmissions: vi.fn(),
-        rowCountMismatch: false,
-        setRowCountMismatch: vi.fn(),
-        toggleDiscardSubmission: vi.fn(),
+        timeFormat: '24h',
+        setTimeFormat: vi.fn(),
+        hiddenNames,
+        setHiddenNames: vi.fn(),
       }}
     >
-      <ResultsList />
-    </ProjectContext.Provider>
+      <ProjectContext.Provider
+        value={{
+          project,
+          setProject: vi.fn(),
+          submissions,
+          setSubmissions: vi.fn(),
+          rowCountMismatch: false,
+          setRowCountMismatch: vi.fn(),
+          toggleDiscardSubmission: vi.fn(),
+        }}
+      >
+        <ResultsList />
+      </ProjectContext.Provider>
+    </AppPreferencesContext.Provider>
   )
 }
 
@@ -159,5 +169,96 @@ describe('ResultsList bulk email copy', () => {
     const textarea = within(modal).getByRole('textbox') as HTMLTextAreaElement
     expect(textarea.value).toBe('accepted@example.com')
     expect(textarea.value).not.toContain('rejected@example.com')
+  })
+
+  it('renders special-event picks below rejection and keeps them out of the rejection list', () => {
+    const specialStage: Stage = {
+      id: 'stage-special',
+      name: 'Partner Stage',
+      stageType: 'special',
+    }
+    const project: Project = {
+      ...makeProject(),
+      stages: [testStage, specialStage],
+      assignments: [
+        {
+          type: 'dj',
+          stageId: 'stage-1',
+          evening: 'Friday',
+          slotIndex: 0,
+          eventIndex: 0,
+          submissionNumber: 'S001',
+        },
+        {
+          type: 'dj',
+          stageId: 'stage-special',
+          evening: '',
+          slotIndex: 0,
+          eventIndex: 0,
+          submissionNumber: 'S002',
+        },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ Accepted', { contactEmail: 'accepted@example.com' }),
+      makeSubmission('S002', 'DJ Special', { contactEmail: 'special@example.com' }),
+      makeSubmission('S003', 'DJ Rejected', { contactEmail: 'rejected@example.com' }),
+    ]
+
+    renderResults(project, submissions)
+
+    const rejectionHeading = screen.getByRole('heading', { name: 'Did Not Make the Cut' })
+    const specialHeading = screen.getByRole('heading', { name: 'Special Events' })
+    expect(rejectionHeading.compareDocumentPosition(specialHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const rejectionSection = rejectionHeading.closest('section') as HTMLElement
+    expect(within(rejectionSection).queryByText('DJ Special')).toBeNull()
+    expect(within(rejectionSection).getByText('DJ Rejected')).toBeTruthy()
+
+    const specialSection = specialHeading.closest('section') as HTMLElement
+    expect(within(specialSection).getByText('DJ Special')).toBeTruthy()
+    expect(within(specialSection).queryByText(/Friday/)).toBeNull()
+  })
+
+  it('applies hidden-name behavior to special-event results', () => {
+    const specialStage: Stage = {
+      id: 'stage-special',
+      name: 'Partner Stage',
+      stageType: 'special',
+    }
+    const project: Project = {
+      ...makeProject(),
+      stages: [testStage, specialStage],
+      assignments: [
+        {
+          type: 'dj',
+          stageId: 'stage-1',
+          evening: 'Friday',
+          slotIndex: 0,
+          eventIndex: 0,
+          submissionNumber: 'S001',
+        },
+        {
+          type: 'dj',
+          stageId: 'stage-special',
+          evening: '',
+          slotIndex: 0,
+          eventIndex: 0,
+          submissionNumber: 'S002',
+        },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ Accepted', { contactEmail: 'accepted@example.com' }),
+      makeSubmission('S002', 'DJ Special', { contactEmail: 'special@example.com' }),
+      makeSubmission('S003', 'DJ Rejected', { contactEmail: 'rejected@example.com' }),
+    ]
+
+    renderResults(project, submissions, true)
+
+    const specialHeading = screen.getByRole('heading', { name: 'Special Events' })
+    const specialSection = specialHeading.closest('section') as HTMLElement
+    expect(within(specialSection).queryByText('DJ Special')).toBeNull()
+    expect(within(specialSection).getByText('DJ #2')).toBeTruthy()
   })
 })
