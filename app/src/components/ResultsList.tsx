@@ -204,12 +204,12 @@ function DJRowItem({ row, isSelected, onClick }: DJRowItemProps) {
 }
 
 interface EmailModalProps {
-  stageName: string
+  label: string
   emails: string
   onClose: () => void
 }
 
-function EmailModal({ stageName, emails, onClose }: EmailModalProps) {
+function EmailModal({ label, emails, onClose }: EmailModalProps) {
   const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard
   const [copied, setCopied] = useState(false)
 
@@ -219,11 +219,11 @@ function EmailModal({ stageName, emails, onClose }: EmailModalProps) {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`${stageName} emails`}
+      aria-label={`${label} emails`}
     >
       <div className="results-email-modal" onClick={(e) => e.stopPropagation()}>
         <div className="results-email-modal-header">
-          <h3 className="results-email-modal-title">{stageName} — Emails</h3>
+          <h3 className="results-email-modal-title">{label} — Emails</h3>
           <button
             type="button"
             className="results-email-modal-close"
@@ -275,7 +275,7 @@ function EmailModal({ stageName, emails, onClose }: EmailModalProps) {
 export function ResultsList() {
   const { project, submissions } = useProjectContext()
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
-  const [emailModal, setEmailModal] = useState<{ stageName: string; emails: string } | null>(null)
+  const [emailModal, setEmailModal] = useState<{ label: string; emails: string } | null>(null)
 
   if (!submissions) return null
 
@@ -294,13 +294,13 @@ export function ResultsList() {
     setSelectedSubmission(null)
   }
 
-  function handleOpenEmailModal(stageName: string, rows: ResultRow[]) {
+  function handleOpenEmailModal(label: string, rows: ResultRow[]) {
     const emails = rows
       .filter((r): r is DJRow => !('blankAssignment' in r))
       .map((r) => r.submission.contactEmail)
       .filter(Boolean)
       .join(', ')
-    setEmailModal({ stageName, emails })
+    setEmailModal({ label, emails })
   }
 
   const listPane = (
@@ -386,9 +386,18 @@ export function ResultsList() {
       {/* Did Not Make the Cut */}
       {rejectionList.length > 0 && (
         <section className="results-stage-section results-rejection-section">
-          <h2 className="results-stage-heading results-rejection-heading">
-            Did Not Make the Cut
-          </h2>
+          <div className="results-stage-heading-row">
+            <h2 className="results-stage-heading results-rejection-heading">
+              Did Not Make the Cut
+            </h2>
+            <button
+              type="button"
+              className="results-copy-stage-btn"
+              onClick={() => handleOpenEmailModal('Did Not Make the Cut', rejectionList)}
+            >
+              Copy emails
+            </button>
+          </div>
           <div className="results-dj-list">
             {rejectionList.map(({ submission: s }) => (
               <DJRowItem
@@ -408,7 +417,7 @@ export function ResultsList() {
     <>
       {emailModal && (
         <EmailModal
-          stageName={emailModal.stageName}
+          label={emailModal.label}
           emails={emailModal.emails}
           onClose={() => setEmailModal(null)}
         />
