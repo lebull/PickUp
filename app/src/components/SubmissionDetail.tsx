@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import type { Submission } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { useProjectContext } from '../ProjectContext.ts'
+import { getSubmissionDeclinedNotice } from '../declinedContext.ts'
 
 function val(s: string | null | undefined): string {
   return s?.trim() || '—'
@@ -81,9 +82,10 @@ interface Props {
 }
 
 export function SubmissionDetail({ submission: s, onBack }: Props) {
-  const { hiddenNames } = useAppPreferences()
+  const { hiddenNames, timeFormat } = useAppPreferences()
   const { project, toggleDiscardSubmission } = useProjectContext()
   const isDiscarded = (project.discardedSubmissions ?? []).includes(s.submissionNumber)
+  const declinedNotice = getSubmissionDeclinedNotice(project, s.submissionNumber, timeFormat)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -189,6 +191,13 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
       </div>
 
       <h1 className="detail-title">{displayName}</h1>
+
+      {declinedNotice && (
+        <div className="detail-declined-notice" role="status">
+          <strong>This DJ declined their assigned slot.</strong>
+          <span>{declinedNotice.context.summary}</span>
+        </div>
+      )}
 
       <SubmissionSummary submission={s} anonymousLabel={anonymousLabel} />
 

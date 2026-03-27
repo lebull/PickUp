@@ -6,7 +6,7 @@ import { hexToTint } from '../stageColors.ts'
 export type SortField = 'main' | 'ml' | 'number' | null
 export type SortDir = 'asc' | 'desc'
 export type ScoreMetric = 'avg' | 'sum'
-export type RowState = 'discarded' | 'in-lineup' | 'duplicate-name' | 'none'
+export type RowState = 'discarded' | 'declined' | 'in-lineup' | 'duplicate-name' | 'none'
 
 function getScore(s: Submission, field: SortField, metric: ScoreMetric): number | null {
   if (field === 'main') return metric === 'avg' ? s.mainScore.avg : s.mainScore.sum
@@ -148,6 +148,18 @@ export function SubmissionList({
     return map
   }, [stages, assignments])
 
+  // Map submissionNumber -> declined flag from active slot assignment state
+  const declinedSubmissionNumbers = useMemo(() => {
+    const declined = new Set<string>()
+    for (const a of assignments) {
+      if (a.type !== 'dj') continue
+      if ((a.acceptanceStatus ?? 'pending') === 'no') {
+        declined.add(a.submissionNumber)
+      }
+    }
+    return declined
+  }, [assignments])
+
   // Keyboard navigation handler attached to the list container
   useEffect(() => {
     const el: HTMLDivElement | null = listRef.current
@@ -249,14 +261,21 @@ export function SubmissionList({
             {sorted.map((s, displayedIndex) => {
               const origIndex = submissions.indexOf(s)
               const isDiscarded = discardedSubmissionNumbers.has(s.submissionNumber)
+              const isDeclined = declinedSubmissionNumbers.has(s.submissionNumber)
               const inLineup = lineupSubmissionNumbers.has(s.submissionNumber)
               const isDuplicate = !isDiscarded && duplicateNames.has(s.djName)
               const isCursor = cursorIndex === displayedIndex
 
-              const rowState: RowState = isDiscarded ? 'discarded'
-                : inLineup ? (showStageAssignments ? 'in-lineup' : 'none')
-                  : isDuplicate ? 'duplicate-name'
-                    : 'none'
+              const stateByPriority: RowState = isDiscarded ? 'discarded'
+                : isDeclined ? 'declined'
+                  : inLineup ? 'in-lineup'
+                    : isDuplicate ? 'duplicate-name'
+                      : 'none'
+
+              const rowState: RowState =
+                stateByPriority === 'in-lineup' && !showStageAssignments
+                  ? 'none'
+                  : stateByPriority
 
               const stageInfo = submissionStageInfo.get(s.submissionNumber)
 
@@ -282,8 +301,9 @@ export function SubmissionList({
 
                   <td>
                     {hiddenNames ? `DJ #${origIndex + 1}` : s.djName}
-                    {rowState === 'discarded' && <span className="discarded-badge">✕ Discarded</span>}
-                    {rowState === 'duplicate-name' && <span className="duplicate-badge">⚠ Duplicate Name</span>}
+                    {stateByPriority === 'discarded' && <span className="discarded-badge">✕ Discarded</span>}
+                    {stateByPriority === 'declined' && <span className="declined-badge">! Declined</span>}
+                    {stateByPriority === 'duplicate-name' && <span className="duplicate-badge">⚠ Duplicate Name</span>}
                   </td> 
                   {showStageAssignments && (
                     <td>

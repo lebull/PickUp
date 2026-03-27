@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Define behavior for the lineup Results view, including section ordering and how special-event selections are represented.
+
+## Requirements
 
 ### Requirement: Results list shows special-event selections above rejection list
 The Results view SHALL include special-event DJ selections in a dedicated section rendered above "Did Not Make the Cut". Special-event entries SHALL not be included in the rejection section.

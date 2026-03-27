@@ -504,3 +504,110 @@ describe('ResultsList day grouping', () => {
     expect(screen.getByRole('heading', { name: 'Friday' })).toBeTruthy()
   })
 })
+
+// ── Prior-decline status ─────────────────────────────────────────────────────
+
+describe('ResultsList prior-decline status', () => {
+  it('shows prior-decline status at top of detail panel when a selected slot has decline history', () => {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        {
+          type: 'dj',
+          stageId: 'stage-1',
+          evening: 'Friday',
+          slotIndex: 0,
+          eventIndex: 0,
+          submissionNumber: 'S001',
+          acceptanceStatus: 'pending',
+          declinedBy: ['S002'],
+        },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ Current'),
+      makeSubmission('S002', 'DJ Prior'),
+    ]
+
+    renderResults(project, submissions)
+    fireEvent.click(screen.getByText('DJ Current').closest('button')!)
+
+    const status = document.querySelector('.results-prior-decline-status') as HTMLElement
+    expect(status).toBeTruthy()
+    expect(within(status).getByText('Previously declined:')).toBeTruthy()
+    expect(within(status).getByText('DJ Prior')).toBeTruthy()
+    expect(within(status).getByText('Main Stage · Friday · 20:00')).toBeTruthy()
+  })
+
+  it('shows prior-decline status at top of replacement picker in hidden-name mode', () => {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        {
+          type: 'dj',
+          stageId: 'stage-1',
+          evening: 'Friday',
+          slotIndex: 0,
+          eventIndex: 0,
+          submissionNumber: 'S001',
+          acceptanceStatus: 'no',
+          declinedBy: ['S002'],
+        },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ Current'),
+      makeSubmission('S002', 'DJ Prior'),
+      makeSubmission('S003', 'DJ Available'),
+    ]
+
+    renderResults(project, submissions, true)
+    fireEvent.click(screen.getByText('DJ #1').closest('button')!)
+
+    const status = document.querySelector('.results-prior-decline-status') as HTMLElement
+    expect(status).toBeTruthy()
+    expect(within(status).getByText('Previously declined:')).toBeTruthy()
+    expect(within(status).getByText('DJ #2')).toBeTruthy()
+  })
+
+  it('supports prior-decline status for simultaneous-slot replacement picker', () => {
+    const simStage: Stage = {
+      id: 'stage-sim',
+      name: 'Silent Disco',
+      stageType: 'simultaneous',
+      activeDays: ['Friday'],
+      schedule: {
+        Friday: [{ startTime: '21:00', endTime: '23:00' }],
+      },
+    }
+    const project: Project = {
+      ...makeProject(),
+      stages: [simStage],
+      assignments: [
+        {
+          type: 'dj',
+          stageId: 'stage-sim',
+          evening: 'Friday',
+          positionIndex: 2,
+          eventIndex: 0,
+          submissionNumber: 'S001',
+          acceptanceStatus: 'no',
+          declinedBy: ['S002'],
+        },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ Current'),
+      makeSubmission('S002', 'DJ Prior'),
+      makeSubmission('S003', 'DJ Available'),
+    ]
+
+    renderResults(project, submissions)
+    fireEvent.click(screen.getByText('DJ Current').closest('button')!)
+
+    const status = document.querySelector('.results-prior-decline-status') as HTMLElement
+    expect(status).toBeTruthy()
+    expect(within(status).getByText('Previously declined:')).toBeTruthy()
+    expect(within(status).getByText('Silent Disco · Friday · Set 1 · Position 2')).toBeTruthy()
+  })
+})

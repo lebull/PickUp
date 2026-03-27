@@ -8,6 +8,7 @@ import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { getEventLabel, getSlotLabels, getStageEventType, formatTimeLabel } from '../lineupUtils.ts'
 import { DJSelectionPanel } from './DJSelectionPanel.tsx'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
+import { getAssignmentDisplayContext } from '../declinedContext.ts'
 
 // ── Data helpers ─────────────────────────────────────────────────────────────
 
@@ -258,7 +259,7 @@ interface DJRowItemProps {
   row: DJRow
   displayName: string
   isSelected: boolean
-  onClick: (sub: Submission) => void
+  onClick: (sub: Submission, assignment?: DJSlotAssignment) => void
   acceptanceStatus?: 'pending' | 'yes' | 'no'
   onSetAcceptance?: (status: 'yes' | 'no') => void
   isReplacementActive?: boolean
@@ -277,7 +278,7 @@ function DJRowItem({ row, displayName, isSelected, onClick, acceptanceStatus, on
         if (acceptanceStatus === 'no' && onReplacementClick) {
           onReplacementClick()
         } else {
-          onClick(s)
+          onClick(s, row.assignment)
         }
       }}
       type="button"
@@ -413,6 +414,7 @@ export function ResultsList() {
   const { project, submissions, setAcceptanceStatus, replaceWithDeclineHistory } = useProjectContext()
   const { hiddenNames, timeFormat } = useAppPreferences()
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
+  const [selectedSlotAssignment, setSelectedSlotAssignment] = useState<DJSlotAssignment | null>(null)
   const [emailModal, setEmailModal] = useState<{ label: string; emails: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeReplacementSlot, setActiveReplacementSlot] = useState<{ slotCoord: SlotCoord; assignment: DJSlotAssignment } | null>(null)
@@ -426,15 +428,25 @@ export function ResultsList() {
   const hasSelection = selectedSubmission !== null
   const hasReplacementPicker = activeReplacementSlot !== null
 
-  function handleSelectDJ(sub: Submission) {
+  function handleSelectDJ(sub: Submission, assignment?: DJSlotAssignment) {
+    const isSameSubmission = selectedSubmission?.submissionNumber === sub.submissionNumber
+    const isSameSlot =
+      (!selectedSlotAssignment && !assignment) ||
+      (!!selectedSlotAssignment && !!assignment && isSameSlotCoord(assignmentToSlotCoord(selectedSlotAssignment), assignmentToSlotCoord(assignment)))
+
     setActiveReplacementSlot(null)
-    setSelectedSubmission((prev) =>
-      prev?.submissionNumber === sub.submissionNumber ? null : sub
-    )
+    if (isSameSubmission && isSameSlot) {
+      setSelectedSubmission(null)
+      setSelectedSlotAssignment(null)
+      return
+    }
+    setSelectedSubmission(sub)
+    setSelectedSlotAssignment(assignment ?? null)
   }
 
   function handleCloseDetail() {
     setSelectedSubmission(null)
+    setSelectedSlotAssignment(null)
   }
 
   function getDisplayName(sub: Submission): string {
@@ -494,6 +506,7 @@ export function ResultsList() {
   function handleReplacementToggle(assignment: DJSlotAssignment) {
     const coord = assignmentToSlotCoord(assignment)
     setSelectedSubmission(null)
+    setSelectedSlotAssignment(null)
     setActiveReplacementSlot((prev) => {
       if (prev && isSameSlotCoord(prev.slotCoord, coord)) return null
       return { slotCoord: coord, assignment }
@@ -721,6 +734,24 @@ export function ResultsList() {
     </div>
   )
 
+  const activePanelAssignment = activeReplacementSlot?.assignment ?? selectedSlotAssignment
+  const priorDeclinedNumbers = activePanelAssignment?.declinedBy ?? []
+  const priorDeclinedNames = [...new Set(priorDeclinedNumbers.map((submissionNumber) => {
+    const sub = allSubmissions.find((s) => s.submissionNumber === submissionNumber)
+    return sub ? getDisplayName(sub) : `DJ ${submissionNumber}`
+  }))]
+  const priorDeclineContext = activePanelAssignment
+    ? getAssignmentDisplayContext(project.stages, activePanelAssignment, timeFormat)
+    : null
+
+  const priorDeclineStatus = activePanelAssignment && priorDeclinedNames.length > 0 && priorDeclineContext ? (
+    <div className="results-prior-decline-status" role="status">
+      <strong>Previously declined:</strong>{' '}
+      {priorDeclinedNames.join(', ')}
+      <span className="results-prior-decline-slot">{priorDeclineContext.summary}</span>
+    </div>
+  ) : null
+
   return (
     <>
       {emailModal && (
@@ -734,6 +765,7 @@ export function ResultsList() {
         <SplitPane initialSplit={45} minLeft={30} minRight={25}>
           {listPane}
           <div className="split-pane-detail-inner">
+            {priorDeclineStatus}
             {replacementPickerPanel}
           </div>
         </SplitPane>
@@ -741,6 +773,7 @@ export function ResultsList() {
         <SplitPane initialSplit={45} minLeft={30} minRight={25}>
           {listPane}
           <div className="split-pane-detail-inner">
+            {priorDeclineStatus}
             <SubmissionDetail
               submission={selectedSubmission}
               onBack={handleCloseDetail}
