@@ -81,7 +81,9 @@ function makeProject(): Project {
   }
 }
 
-function renderLineup() {
+function renderLineup(options: { hiddenNames?: boolean } = {}) {
+  const { hiddenNames = false } = options
+
   function Harness() {
     const [project, setProject] = useState<Project | null>(makeProject())
     const [submissions, setSubmissions] = useState<Submission[] | null>([
@@ -107,7 +109,7 @@ function renderLineup() {
         value={{
           timeFormat: '24h',
           setTimeFormat: () => undefined,
-          hiddenNames: false,
+          hiddenNames,
           setHiddenNames: () => undefined,
         }}
       >
@@ -183,5 +185,17 @@ describe('LineupView special events mode', () => {
 
     // After removal, extra trailing empties should collapse.
     expect(screen.queryByText('Pick 3')).toBeNull()
+  })
+
+  it('hides names in Special Events mode when hidden names is enabled', async () => {
+    const user = userEvent.setup()
+    renderLineup({ hiddenNames: true })
+
+    await user.click(screen.getByRole('button', { name: 'Special Events' }))
+    await user.click(screen.getByRole('button', { name: 'Select Event' }))
+    await user.click(screen.getByRole('button', { name: 'Assign DJ #1' }))
+
+    expect(screen.queryByText('DJ Alpha')).toBeNull()
+    expect(screen.getAllByText('DJ #1').length).toBeGreaterThan(0)
   })
 })

@@ -11,9 +11,11 @@ import { isSimultaneousCoord, isSlotAssignment } from '../types.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { getSlotLabels } from '../lineupUtils.ts'
 import { hexToTint } from '../stageColors.ts'
+import { useAppPreferences } from '../AppPreferencesContext.ts'
 
 export function LineupView() {
   const { project, setProject, submissions, rowCountMismatch, setRowCountMismatch } = useProjectContext()
+  const { hiddenNames } = useAppPreferences()
 
   const [showStageConfig, setShowStageConfig] = useState(false)
   const [activeSlot, setActiveSlot] = useState<ActiveSlot | null>(null)
@@ -106,6 +108,12 @@ export function LineupView() {
         assignments: slotAssignments.filter((a) => a.stageId === stage.id).sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0)),
       }))
   }, [project.stages, slotAssignments])
+
+  function getDisplayName(submissionNumber: string): string {
+    const idx = submissions.findIndex((s) => s.submissionNumber === submissionNumber)
+    if (hiddenNames) return idx >= 0 ? `DJ #${idx + 1}` : submissionNumber
+    return submissions[idx]?.djName ?? submissionNumber
+  }
 
   function getNextSpecialSlotIndex(stageId: string): number {
     const existing = slotAssignments.filter((a) => a.stageId === stageId)
@@ -559,7 +567,7 @@ export function LineupView() {
                                     : undefined
                                 }
                               >
-                                <span>{sub.djName}</span>
+                                <span>{getDisplayName(sub.submissionNumber)}</span>
                                 <div className="special-events-item-actions">
                                   <button
                                     type="button"
