@@ -2606,13 +2606,14 @@ input[type="time"] {
 
 .results-dj-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr auto;
   align-items: center;
   gap: 0.5rem;
   padding: 0.55rem 0.75rem;
   border-radius: 6px;
   background: #1e1e1e;
   border: 1px solid transparent;
+  border-left-width: 3px;
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -2826,6 +2827,102 @@ input[type="time"] {
   color: #ccc;
   border-color: #555;
   background: #252525;
+}
+
+/* ── Results: search input ── */
+
+.results-search-row {
+  display: flex;
+  align-items: center;
+}
+
+.results-search-input {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #eee;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.results-search-input:focus {
+  border-color: #4a90d9;
+}
+
+/* ── Results: day group headings ── */
+
+.results-day-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.results-day-heading {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.4rem 0.75rem 0.2rem;
+  margin: 0;
+}
+
+/* ── Results: acceptance status row states ── */
+
+.results-dj-row--accepted {
+  border-left: 3px solid #22c55e;
+}
+
+.results-dj-row--declined {
+  border-left: 3px solid #ef4444;
+  opacity: 0.85;
+}
+
+.results-dj-row--picker-active {
+  background: #1a2535 !important;
+  border-color: #3b82f6 !important;
+}
+
+/* ── Results: acceptance controls ── */
+
+.results-acceptance-controls {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.results-acceptance-btn {
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #888;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.results-acceptance-btn:hover {
+  border-color: #666;
+  color: #ccc;
+}
+
+.results-acceptance-btn--yes.active {
+  background: #166534;
+  border-color: #22c55e;
+  color: #86efac;
+}
+
+.results-acceptance-btn--no.active {
+  background: #7f1d1d;
+  border-color: #ef4444;
+  color: #fca5a5;
 }
 
 /* ── Results: total count summary ── */

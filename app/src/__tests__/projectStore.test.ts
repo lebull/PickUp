@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeProject } from '../projectStore'
-import type { Project } from '../types'
+import { normalizeProject, applySetAcceptanceStatus, applyReplaceWithDeclineHistory } from '../projectStore'
+import type { Project, SlotCoord } from '../types'
 
 function makeBaseProject(): Project {
   return {
@@ -76,5 +76,115 @@ describe('projectStore normalization', () => {
     const normalized = normalizeProject(input)
     expect(normalized.assignments.length).toBe(3)
     expect(normalized.assignments.every((a) => !('evening' in a))).toBe(true)
+  })
+})
+
+// ── applySetAcceptanceStatus ──────────────────────────────────────────────────
+
+function makeProjectWithDJAssignment(submissionNumber = 'S001'): Project {
+  return {
+    ...makeBaseProject(),
+    stages: [{ id: 'stage-1', name: 'Main', stageType: 'sequential', activeDays: ['Friday'], schedule: { Friday: [{ startTime: '20:00', endTime: '22:00' }] }, slotDuration: 60 }],
+    assignments: [
+      { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber },
+    ],
+  }
+}
+
+const coord: SlotCoord = { stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0 }
+
+describe('applySetAcceptanceStatus', () => {
+  it('sets acceptanceStatus to yes on the matching assignment', () => {
+    const project = makeProjectWithDJAssignment()
+    const result = applySetAcceptanceStatus(project, coord, 'yes')
+    const assignment = result.assignments[0] as { acceptanceStatus?: string }
+    expect(assignment.acceptanceStatus).toBe('yes')
+  })
+
+  it('sets acceptanceStatus to no on the matching assignment', () => {
+    const project = makeProjectWithDJAssignment()
+    const result = applySetAcceptanceStatus(project, coord, 'no')
+    const assignment = result.assignments[0] as { acceptanceStatus?: string }
+    expect(assignment.acceptanceStatus).toBe('no')
+  })
+
+  it('sets acceptanceStatus to pending on the matching assignment', () => {
+    const project = makeProjectWithDJAssignment()
+    const result = applySetAcceptanceStatus(project, coord, 'pending')
+    const assignment = result.assignments[0] as { acceptanceStatus?: string }
+    expect(assignment.acceptanceStatus).toBe('pending')
+  })
+
+  it('does not modify other assignments', () => {
+    const project: Project = {
+      ...makeBaseProject(),
+      stages: [{ id: 'stage-1', name: 'Main', stageType: 'sequential', activeDays: ['Friday'], schedule: { Friday: [{ startTime: '20:00', endTime: '22:00' }] }, slotDuration: 60 }],
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001' },
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 1, eventIndex: 0, submissionNumber: 'S002' },
+      ],
+    }
+    const result = applySetAcceptanceStatus(project, coord, 'yes')
+    const other = result.assignments[1] as { acceptanceStatus?: string }
+    expect(other.acceptanceStatus).toBeUndefined()
+  })
+
+  it('does not mutate the input project', () => {
+    const project = makeProjectWithDJAssignment()
+    applySetAcceptanceStatus(project, coord, 'yes')
+    const original = project.assignments[0] as { acceptanceStatus?: string }
+    expect(original.acceptanceStatus).toBeUndefined()
+  })
+})
+
+// ── applyReplaceWithDeclineHistory ────────────────────────────────────────────
+
+describe('applyReplaceWithDeclineHistory', () => {
+  it('replaces the submissionNumber on the matching assignment', () => {
+    const project = makeProjectWithDJAssignment('S001')
+    const result = applyReplaceWithDeclineHistory(project, coord, 'S002')
+    const assignment = result.assignments[0] as { submissionNumber: string }
+    expect(assignment.submissionNumber).toBe('S002')
+  })
+
+  it('appends the outgoing DJ to declinedBy', () => {
+    const project = makeProjectWithDJAssignment('S001')
+    const result = applyReplaceWithDeclineHistory(project, coord, 'S002')
+    const assignment = result.assignments[0] as { declinedBy: string[] }
+    expect(assignment.declinedBy).toContain('S001')
+  })
+
+  it('preserves existing declinedBy entries', () => {
+    const project: Project = {
+      ...makeBaseProject(),
+      stages: [{ id: 'stage-1', name: 'Main', stageType: 'sequential', activeDays: ['Friday'], schedule: { Friday: [{ startTime: '20:00', endTime: '22:00' }] }, slotDuration: 60 }],
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S002', declinedBy: ['S001'] },
+      ],
+    }
+    const result = applyReplaceWithDeclineHistory(project, coord, 'S003')
+    const assignment = result.assignments[0] as { declinedBy: string[] }
+    expect(assignment.declinedBy).toEqual(['S001', 'S002'])
+  })
+
+  it('resets acceptanceStatus to pending', () => {
+    const project: Project = {
+      ...makeBaseProject(),
+      stages: [{ id: 'stage-1', name: 'Main', stageType: 'sequential', activeDays: ['Friday'], schedule: { Friday: [{ startTime: '20:00', endTime: '22:00' }] }, slotDuration: 60 }],
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001', acceptanceStatus: 'no' },
+      ],
+    }
+    const result = applyReplaceWithDeclineHistory(project, coord, 'S002')
+    const assignment = result.assignments[0] as { acceptanceStatus: string }
+    expect(assignment.acceptanceStatus).toBe('pending')
+  })
+
+  it('does not mutate the input project', () => {
+    const project = makeProjectWithDJAssignment('S001')
+    applyReplaceWithDeclineHistory(project, coord, 'S002')
+    const original = project.assignments[0] as { submissionNumber: string; declinedBy?: string[] }
+    expect(original.submissionNumber).toBe('S001')
+    expect(original.declinedBy).toBeUndefined()
   })
 })

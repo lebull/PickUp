@@ -331,3 +331,50 @@ describe('DJSelectionPanel — special event list behavior', () => {
     expect(screen.getByRole('button', { name: 'Assign DJ Saturday' })).toBeTruthy()
   })
 })
+
+// ── excludedSubmissionNumbers ─────────────────────────────────────────────────
+
+describe('DJSelectionPanel — excludedSubmissionNumbers', () => {
+  it('hides DJs whose submission numbers are in the excluded set', () => {
+    const dj1 = makeSubmission('S001', 'DJ Alpha')
+    const dj2 = makeSubmission('S002', 'DJ Beta')
+    const dj3 = makeSubmission('S003', 'DJ Gamma')
+
+    render(
+      <Wrapper>
+        <DJSelectionPanel
+          submissions={[dj1, dj2, dj3]}
+          stages={[testStage]}
+          assignments={[]}
+          discardedSubmissionNumbers={new Set()}
+          excludedSubmissionNumbers={new Set(['S001', 'S002'])}
+          activeSlot={activeSlot}
+          currentEvening="Friday"
+          onAssign={vi.fn()}
+          onRemove={vi.fn()}
+          onAddSimultaneous={vi.fn()}
+          onRemoveSimultaneous={vi.fn()}
+          onAssignBlank={vi.fn()}
+          onAddBlankSimultaneous={vi.fn()}
+          onPositionSelect={vi.fn()}
+          onSelectSlot={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    expect(screen.queryByRole('button', { name: 'Assign DJ Alpha' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Assign DJ Beta' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Assign DJ Gamma' })).toBeTruthy()
+  })
+
+  it('shows all DJs when excludedSubmissionNumbers is not provided', () => {
+    const dj1 = makeSubmission('S001', 'DJ Alpha')
+    const dj2 = makeSubmission('S002', 'DJ Beta')
+
+    renderPanel([dj1, dj2], [], vi.fn(), [testStage])
+
+    expect(screen.getByRole('button', { name: 'Assign DJ Alpha' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Assign DJ Beta' })).toBeTruthy()
+  })
+})

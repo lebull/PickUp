@@ -40,6 +40,10 @@ interface SlotAssignmentBase {
 export interface DJSlotAssignment extends SlotAssignmentBase {
   type: 'dj'
   submissionNumber: string
+  /** Whether the assigned DJ has confirmed participation. Defaults to 'pending'. */
+  acceptanceStatus?: 'pending' | 'yes' | 'no'
+  /** submissionNumbers of DJs who previously held this slot and declined. Accumulated across replacement rounds. */
+  declinedBy?: string[]
 }
 
 export interface BlankSlotAssignment extends SlotAssignmentBase {

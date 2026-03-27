@@ -1,5 +1,6 @@
 import { openDB } from 'idb'
-import type { Project, SlotAssignment, Assignment } from './types'
+import type { Project, SlotAssignment, Assignment, SlotCoord, DJSlotAssignment } from './types'
+import { isSlotAssignment, isBlankAssignment, isSimultaneousCoord } from './types'
 
 const DB_NAME = 'pickup-lineups'
 const STORE_NAME = 'projects'
@@ -170,4 +171,54 @@ export async function importProjectFromFile(file: File): Promise<Project> {
   const normalized = normalizeProject(project)
   await saveProject(normalized)
   return normalized
+}
+
+// ── Pure acceptance-tracking mutations ────────────────────────────────────────
+
+function matchesSlotCoord(a: SlotAssignment, slotCoord: SlotCoord): boolean {
+  if (isSimultaneousCoord(slotCoord)) {
+    return a.stageId === slotCoord.stageId && a.evening === slotCoord.evening &&
+      a.positionIndex === slotCoord.positionIndex && (a.eventIndex ?? 0) === slotCoord.eventIndex
+  }
+  return a.stageId === slotCoord.stageId && a.evening === slotCoord.evening &&
+    a.slotIndex === slotCoord.slotIndex && (a.eventIndex ?? 0) === slotCoord.eventIndex
+}
+
+/**
+ * Returns a new Project with the acceptance status of the specified slot assignment updated.
+ */
+export function applySetAcceptanceStatus(
+  project: Project,
+  slotCoord: SlotCoord,
+  status: 'pending' | 'yes' | 'no'
+): Project {
+  return {
+    ...project,
+    assignments: project.assignments.map((a): Assignment => {
+      if (!isSlotAssignment(a) || isBlankAssignment(a)) return a
+      if (!matchesSlotCoord(a, slotCoord)) return a
+      return { ...(a as DJSlotAssignment), acceptanceStatus: status }
+    }),
+  }
+}
+
+/**
+ * Returns a new Project with the declining DJ replaced by a new DJ in the specified slot.
+ * The outgoing DJ's submissionNumber is appended to declinedBy, and acceptanceStatus resets to 'pending'.
+ */
+export function applyReplaceWithDeclineHistory(
+  project: Project,
+  slotCoord: SlotCoord,
+  newSubmissionNumber: string
+): Project {
+  return {
+    ...project,
+    assignments: project.assignments.map((a): Assignment => {
+      if (!isSlotAssignment(a) || isBlankAssignment(a)) return a
+      if (!matchesSlotCoord(a, slotCoord)) return a
+      const dj = a as DJSlotAssignment
+      const accumulated = [...(dj.declinedBy ?? []), dj.submissionNumber]
+      return { ...dj, submissionNumber: newSubmissionNumber, acceptanceStatus: 'pending', declinedBy: accumulated }
+    }),
+  }
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { Project, Submission } from './types.ts'
+import type { Project, Submission, SlotCoord } from './types.ts'
 
 export interface ProjectContextValue {
   project: Project
@@ -10,6 +10,8 @@ export interface ProjectContextValue {
   rowCountMismatch: boolean
   setRowCountMismatch: Dispatch<SetStateAction<boolean>>
   toggleDiscardSubmission: (submissionNumber: string) => void
+  setAcceptanceStatus: (slotCoord: SlotCoord, status: 'pending' | 'yes' | 'no') => void
+  replaceWithDeclineHistory: (slotCoord: SlotCoord, newSubmissionNumber: string) => void
 }
 
 export const ProjectContext = createContext<ProjectContextValue | null>(null)

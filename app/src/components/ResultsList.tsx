@@ -1,17 +1,27 @@
 import { useState } from 'react'
 import { useProjectContext } from '../ProjectContext.ts'
-import type { Submission, BlankSlotAssignment, Stage, SlotAssignment, DJSlotAssignment } from '../types.ts'
-import { isBlankAssignment, getBlankLabel, isSlotAssignment } from '../types.ts'
+import type { Submission, BlankSlotAssignment, Stage, SlotAssignment, DJSlotAssignment, SlotCoord } from '../types.ts'
+import { isBlankAssignment, getBlankLabel, isSlotAssignment, isSimultaneousCoord } from '../types.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { getEventLabel, getSlotLabels, getStageEventType } from '../lineupUtils.ts'
+import { getEventLabel, getSlotLabels, getStageEventType, formatTimeLabel } from '../lineupUtils.ts'
+import { DJSelectionPanel } from './DJSelectionPanel.tsx'
+import type { ActiveSlot } from './DJSelectionPanel.tsx'
 
 // ── Data helpers ─────────────────────────────────────────────────────────────
 
 interface DJRow {
   submission: Submission
   stageLabel?: string // for accepted rows
+  assignment?: DJSlotAssignment // for stage-section rows (acceptance tracking)
+}
+
+interface StageResultSection {
+  stageId: string
+  stageName: string
+  rows: ResultRow[] // flat (for email/count)
+  dayGroups: Array<{ evening: string; rows: ResultRow[] }>
 }
 
 interface BlankRow {
@@ -41,6 +51,11 @@ interface SpecialEventSection {
   key: string
   label: string
   rows: DJRow[]
+}
+
+function getRowEvening(row: ResultRow): string {
+  if ('blankAssignment' in row) return row.blankAssignment.evening
+  return row.assignment?.evening ?? ''
 }
 
 function buildResultsData(
@@ -89,7 +104,7 @@ function buildResultsData(
   }
 
   // Accepted: per stage, collect assigned submissions and blank slots in slot order
-  const acceptedByStage: Array<{ stageId: string; stageName: string; rows: ResultRow[] }> = []
+  const acceptedByStage: StageResultSection[] = []
   for (const stage of stages) {
     if (stage.stageType === 'special') continue
     const stageAssignments = slotAssignments
@@ -106,11 +121,29 @@ function buildResultsData(
         rows.push({ blankAssignment: assignment, slotTime: getSlotTimeLabel(assignment, stage) })
       } else {
         const sub = subByNumber.get(assignment.submissionNumber)
-        if (sub) rows.push({ submission: sub })
+        if (sub) rows.push({ submission: sub, assignment })
       }
     }
     if (rows.length > 0) {
-      acceptedByStage.push({ stageId: stage.id, stageName: stage.name, rows })
+      // Build day groups ordered by activeDays, then 'Other'
+      const activeDays = stage.activeDays ?? []
+      const byEvening = new Map<string, ResultRow[]>()
+      for (const row of rows) {
+        const evening = getRowEvening(row)
+        const bucket = byEvening.get(evening) ?? []
+        bucket.push(row)
+        byEvening.set(evening, bucket)
+      }
+      const dayGroups: Array<{ evening: string; rows: ResultRow[] }> = []
+      for (const day of activeDays) {
+        if (byEvening.has(day)) dayGroups.push({ evening: day, rows: byEvening.get(day)! })
+      }
+      const otherRows: ResultRow[] = []
+      for (const [evening, eveningRows] of byEvening) {
+        if (!activeDays.includes(evening)) otherRows.push(...eveningRows)
+      }
+      if (otherRows.length > 0) dayGroups.push({ evening: 'Other', rows: otherRows })
+      acceptedByStage.push({ stageId: stage.id, stageName: stage.name, rows, dayGroups })
     }
   }
 
@@ -226,17 +259,27 @@ interface DJRowItemProps {
   displayName: string
   isSelected: boolean
   onClick: (sub: Submission) => void
+  acceptanceStatus?: 'pending' | 'yes' | 'no'
+  onSetAcceptance?: (status: 'yes' | 'no') => void
+  isReplacementActive?: boolean
+  onReplacementClick?: () => void
 }
 
-function DJRowItem({ row, displayName, isSelected, onClick }: DJRowItemProps) {
+function DJRowItem({ row, displayName, isSelected, onClick, acceptanceStatus, onSetAcceptance, isReplacementActive, onReplacementClick }: DJRowItemProps) {
   const { submission: s } = row
   const [emailCopied, setEmailCopied] = useState(false)
   const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard
 
   return (
     <button
-      className={`results-dj-row${isSelected ? ' selected' : ''}`}
-      onClick={() => onClick(s)}
+      className={`results-dj-row${isSelected ? ' selected' : ''}${acceptanceStatus === 'yes' ? ' results-dj-row--accepted' : ''}${acceptanceStatus === 'no' ? ' results-dj-row--declined' : ''}${isReplacementActive ? ' results-dj-row--picker-active' : ''}`}
+      onClick={() => {
+        if (acceptanceStatus === 'no' && onReplacementClick) {
+          onReplacementClick()
+        } else {
+          onClick(s)
+        }
+      }}
       type="button"
     >
       <span className="results-dj-name">{displayName}</span>
@@ -271,6 +314,28 @@ function DJRowItem({ row, displayName, isSelected, onClick }: DJRowItemProps) {
         {s.genre && <span className="results-meta-genre">{s.genre}</span>}
         {s.formatGear && <span className="results-meta-format">{s.formatGear}</span>}
       </span>
+      {acceptanceStatus !== undefined && (
+        <span className="results-acceptance-controls">
+          <button
+            type="button"
+            className={`results-acceptance-btn results-acceptance-btn--yes${acceptanceStatus === 'yes' ? ' active' : ''}`}
+            onClick={(e) => { e.stopPropagation(); onSetAcceptance?.('yes') }}
+            aria-label="Mark as accepted"
+            aria-pressed={acceptanceStatus === 'yes'}
+          >
+            Yes
+          </button>
+          <button
+            type="button"
+            className={`results-acceptance-btn results-acceptance-btn--no${acceptanceStatus === 'no' ? ' active' : ''}`}
+            onClick={(e) => { e.stopPropagation(); onSetAcceptance?.('no') }}
+            aria-label="Mark as declined"
+            aria-pressed={acceptanceStatus === 'no'}
+          >
+            No
+          </button>
+        </span>
+      )}
     </button>
   )
 }
@@ -345,10 +410,12 @@ function EmailModal({ label, emails, onClose }: EmailModalProps) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function ResultsList() {
-  const { project, submissions } = useProjectContext()
-  const { hiddenNames } = useAppPreferences()
+  const { project, submissions, setAcceptanceStatus, replaceWithDeclineHistory } = useProjectContext()
+  const { hiddenNames, timeFormat } = useAppPreferences()
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
   const [emailModal, setEmailModal] = useState<{ label: string; emails: string } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeReplacementSlot, setActiveReplacementSlot] = useState<{ slotCoord: SlotCoord; assignment: DJSlotAssignment } | null>(null)
 
   if (!submissions) return null
   const allSubmissions = submissions
@@ -357,8 +424,10 @@ export function ResultsList() {
     buildResultsData(allSubmissions, project)
 
   const hasSelection = selectedSubmission !== null
+  const hasReplacementPicker = activeReplacementSlot !== null
 
   function handleSelectDJ(sub: Submission) {
+    setActiveReplacementSlot(null)
     setSelectedSubmission((prev) =>
       prev?.submissionNumber === sub.submissionNumber ? null : sub
     )
@@ -383,8 +452,116 @@ export function ResultsList() {
     setEmailModal({ label, emails })
   }
 
+  function assignmentToSlotCoord(a: DJSlotAssignment): SlotCoord {
+    if (a.positionIndex != null) {
+      return { stageId: a.stageId, evening: a.evening, positionIndex: a.positionIndex, eventIndex: a.eventIndex ?? 0 }
+    }
+    return { stageId: a.stageId, evening: a.evening, slotIndex: a.slotIndex!, eventIndex: a.eventIndex ?? 0 }
+  }
+
+  function isSameSlotCoord(a: SlotCoord, b: SlotCoord): boolean {
+    if (isSimultaneousCoord(a) !== isSimultaneousCoord(b)) return false
+    if (isSimultaneousCoord(a) && isSimultaneousCoord(b)) {
+      return a.stageId === b.stageId && a.evening === b.evening && a.positionIndex === b.positionIndex && a.eventIndex === b.eventIndex
+    }
+    const as = a as { stageId: string; evening: string; slotIndex: number; eventIndex: number }
+    const bs = b as { stageId: string; evening: string; slotIndex: number; eventIndex: number }
+    return as.stageId === bs.stageId && as.evening === bs.evening && as.slotIndex === bs.slotIndex && as.eventIndex === bs.eventIndex
+  }
+
+  function buildActiveSlot(a: DJSlotAssignment, stage: Stage): ActiveSlot {
+    if (a.positionIndex != null) {
+      return { stageId: a.stageId, evening: a.evening, eventIndex: a.eventIndex ?? 0, positionIndex: a.positionIndex, timeLabel: `Pos ${a.positionIndex}` }
+    }
+    const labels = getSlotLabels(stage, a.evening, a.eventIndex ?? 0)
+    const rawLabel = a.slotIndex != null ? (labels[a.slotIndex] ?? a.evening) : a.evening
+    const timeLabel = formatTimeLabel(rawLabel, timeFormat)
+    return { stageId: a.stageId, evening: a.evening, slotIndex: a.slotIndex, eventIndex: a.eventIndex ?? 0, timeLabel }
+  }
+
+  function matchesSearch(sub: Submission): boolean {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      sub.djName.toLowerCase().includes(q) ||
+      sub.furName.toLowerCase().includes(q) ||
+      sub.contactEmail.toLowerCase().includes(q) ||
+      sub.telegramDiscord.toLowerCase().includes(q) ||
+      sub.phone.toLowerCase().includes(q)
+    )
+  }
+
+  function handleReplacementToggle(assignment: DJSlotAssignment) {
+    const coord = assignmentToSlotCoord(assignment)
+    setSelectedSubmission(null)
+    setActiveReplacementSlot((prev) => {
+      if (prev && isSameSlotCoord(prev.slotCoord, coord)) return null
+      return { slotCoord: coord, assignment }
+    })
+  }
+
+  function isReplacementPickerActive(assignment: DJSlotAssignment): boolean {
+    if (!activeReplacementSlot) return false
+    return isSameSlotCoord(activeReplacementSlot.slotCoord, assignmentToSlotCoord(assignment))
+  }
+
+  // Build replacement picker panel (used in right pane when a declined slot is selected)
+  const replacementPickerPanel = hasReplacementPicker ? (() => {
+    const { slotCoord, assignment: declinedAssignment } = activeReplacementSlot
+    const stage = project.stages.find((s) => s.id === declinedAssignment.stageId)
+    if (!stage) return null
+    const activeSlot = buildActiveSlot(declinedAssignment, stage)
+    const excluded = new Set([...(declinedAssignment.declinedBy ?? []), declinedAssignment.submissionNumber])
+    // Filter out the declining DJ's slot so the panel sees an empty slot (enables single-click assign)
+    const filteredAssignments = project.assignments.filter(isSlotAssignment).filter((a): a is SlotAssignment => {
+      if (isSimultaneousCoord(slotCoord)) {
+        return !(a.stageId === slotCoord.stageId && a.evening === slotCoord.evening && a.positionIndex === slotCoord.positionIndex && (a.eventIndex ?? 0) === slotCoord.eventIndex)
+      }
+      const sc = slotCoord as { stageId: string; evening: string; slotIndex: number; eventIndex: number }
+      return !(a.stageId === sc.stageId && a.evening === sc.evening && a.slotIndex === sc.slotIndex && (a.eventIndex ?? 0) === sc.eventIndex)
+    })
+    return (
+      <DJSelectionPanel
+        submissions={allSubmissions}
+        stages={project.stages}
+        assignments={filteredAssignments}
+        discardedSubmissionNumbers={new Set(project.discardedSubmissions ?? [])}
+        excludedSubmissionNumbers={excluded}
+        activeSlot={activeSlot}
+        currentEvening={declinedAssignment.evening}
+        onAssign={(_stageId, _evening, _slotIndex, submissionNumber) => {
+          replaceWithDeclineHistory(slotCoord, submissionNumber)
+          setActiveReplacementSlot(null)
+        }}
+        onAddSimultaneous={(_stageId, _evening, _positionIndex, submissionNumber) => {
+          replaceWithDeclineHistory(slotCoord, submissionNumber)
+          setActiveReplacementSlot(null)
+        }}
+        onRemove={() => {}}
+        onRemoveSimultaneous={() => {}}
+        onAssignBlank={() => {}}
+        onAddBlankSimultaneous={() => {}}
+        onPositionSelect={() => {}}
+        onSelectSlot={() => {}}
+        onClose={() => setActiveReplacementSlot(null)}
+      />
+    )
+  })() : null
+
   const listPane = (
     <div className="results-list-inner">
+      {/* Search input */}
+      <div className="results-search-row">
+        <input
+          type="search"
+          className="results-search-input"
+          placeholder="Search DJs…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="Search DJs"
+        />
+      </div>
+
       {/* Duplicate-submission alert */}
       {duplicateAlerts.length > 0 && (
         <div className="results-duplicate-alert" role="status">
@@ -422,7 +599,7 @@ export function ResultsList() {
             <span>{totalDjCount} DJ{totalDjCount !== 1 ? 's' : ''} assigned across all stages</span>
             <span className="results-count-note">Blocked/open slots are not included in these counts</span>
           </div>
-          {acceptedByStage.map(({ stageId, stageName, rows }) => {
+          {acceptedByStage.map(({ stageId, stageName, rows, dayGroups }) => {
             const djCount = djCountByStage.get(stageId) ?? 0
             return (
               <section key={stageId} className="results-stage-section">
@@ -439,25 +616,41 @@ export function ResultsList() {
                     Copy emails
                   </button>
                 </div>
-                <div className="results-dj-list">
-                  {rows.map((row, rowIdx) =>
-                    'blankAssignment' in row ? (
-                      <div key={`blank-${rowIdx}`} className="results-dj-row results-dj-row--blank">
-                        <span className="results-dj-name">{getBlankLabel(row.blankAssignment)}</span>
-                        <span />
-                        <span className="results-dj-slot-time">{row.slotTime}</span>
+                {dayGroups.map(({ evening, rows: dayRows }) => {
+                  const filteredDayRows = searchQuery
+                    ? dayRows.filter((row) => 'blankAssignment' in row || matchesSearch(row.submission))
+                    : dayRows
+                  return (
+                    <div key={evening} className="results-day-group">
+                      <h3 className="results-day-heading">{evening}</h3>
+                      <div className="results-dj-list">
+                        {filteredDayRows.map((row, rowIdx) =>
+                          'blankAssignment' in row ? (
+                            <div key={`blank-${rowIdx}`} className="results-dj-row results-dj-row--blank">
+                              <span className="results-dj-name">{getBlankLabel(row.blankAssignment)}</span>
+                              <span />
+                              <span className="results-dj-slot-time">{row.slotTime}</span>
+                            </div>
+                          ) : (
+                            <DJRowItem
+                              key={row.submission.submissionNumber}
+                              row={row}
+                              displayName={getDisplayName(row.submission)}
+                              isSelected={selectedSubmission?.submissionNumber === row.submission.submissionNumber}
+                              onClick={handleSelectDJ}
+                              acceptanceStatus={row.assignment?.acceptanceStatus ?? 'pending'}
+                              onSetAcceptance={(status) => {
+                                if (row.assignment) setAcceptanceStatus(assignmentToSlotCoord(row.assignment), status)
+                              }}
+                              isReplacementActive={row.assignment ? isReplacementPickerActive(row.assignment) : false}
+                              onReplacementClick={row.assignment ? () => handleReplacementToggle(row.assignment!) : undefined}
+                            />
+                          )
+                        )}
                       </div>
-                    ) : (
-                      <DJRowItem
-                        key={row.submission.submissionNumber}
-                        row={row}
-                        displayName={getDisplayName(row.submission)}
-                        isSelected={selectedSubmission?.submissionNumber === row.submission.submissionNumber}
-                        onClick={handleSelectDJ}
-                      />
-                    )
-                  )}
-                </div>
+                    </div>
+                  )
+                })}
               </section>
             )
           })}
@@ -513,7 +706,7 @@ export function ResultsList() {
             </button>
           </div>
           <div className="results-dj-list">
-            {rejectionList.map(({ submission: s }) => (
+            {rejectionList.filter(({ submission: s }) => matchesSearch(s)).map(({ submission: s }) => (
               <DJRowItem
                 key={s.submissionNumber}
                 row={{ submission: s }}
@@ -537,7 +730,14 @@ export function ResultsList() {
           onClose={() => setEmailModal(null)}
         />
       )}
-      {hasSelection ? (
+      {hasReplacementPicker ? (
+        <SplitPane initialSplit={45} minLeft={30} minRight={25}>
+          {listPane}
+          <div className="split-pane-detail-inner">
+            {replacementPickerPanel}
+          </div>
+        </SplitPane>
+      ) : hasSelection ? (
         <SplitPane initialSplit={45} minLeft={30} minRight={25}>
           {listPane}
           <div className="split-pane-detail-inner">

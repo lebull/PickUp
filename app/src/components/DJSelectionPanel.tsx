@@ -24,6 +24,8 @@ interface Props {
   stages: Stage[]
   assignments: SlotAssignment[]
   discardedSubmissionNumbers: Set<string>
+  /** Optional additional exclusions (e.g. DJs who previously declined a slot). Combined with discardedSubmissionNumbers. */
+  excludedSubmissionNumbers?: Set<string>
   activeSlot: ActiveSlot | null
   /** The currently selected evening, used for filtering when no slot is active. */
   currentEvening: string
@@ -258,6 +260,7 @@ export function DJSelectionPanel({
   stages,
   assignments,
   discardedSubmissionNumbers,
+  excludedSubmissionNumbers,
   activeSlot,
   currentEvening,
   onAssign,
@@ -346,11 +349,13 @@ export function DJSelectionPanel({
       if (assignedNumbers.has(s.submissionNumber)) return false
       // Exclude discarded submissions
       if (discardedSubmissionNumbers.has(s.submissionNumber)) return false
+      // Exclude additionally excluded submissions (e.g. prior declinors)
+      if (excludedSubmissionNumbers?.has(s.submissionNumber)) return false
       // In moonlight context, only show moonlight-opted-in submissions
       if (useMoonlight && !s.moonlightInterest) return false
       return true
     })
-  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, useMoonlight])
+  }, [submissions, currentAssignment, assignedNumbers, discardedSubmissionNumbers, excludedSubmissionNumbers, useMoonlight])
 
   // Apply the "Available only" opt-in filter on top of the base pool
   const filtered = useMemo(() => {

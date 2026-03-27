@@ -102,6 +102,8 @@ function renderLineup(options: { hiddenNames?: boolean } = {}) {
       rowCountMismatch,
       setRowCountMismatch,
       toggleDiscardSubmission: () => undefined,
+      setAcceptanceStatus: () => undefined,
+      replaceWithDeclineHistory: () => undefined,
     }
 
     return (
@@ -141,7 +143,7 @@ describe('LineupView special events mode', () => {
     renderLineup()
 
     await user.click(screen.getByRole('button', { name: 'Special Events' }))
-    await user.click(screen.getByRole('button', { name: 'Select Event' }))
+    await user.click(screen.getByRole('heading', { name: 'VIP Showcase' }))
     await user.click(screen.getByRole('button', { name: 'Assign DJ Alpha' }))
 
     expect(screen.getAllByText('VIP Showcase').length).toBeGreaterThan(0)
@@ -153,7 +155,7 @@ describe('LineupView special events mode', () => {
     renderLineup()
 
     await user.click(screen.getByRole('button', { name: 'Special Events' }))
-    await user.click(screen.getByRole('button', { name: 'Select Event' }))
+    await user.click(screen.getByRole('heading', { name: 'VIP Showcase' }))
 
     expect(screen.getByText('Pick 1')).toBeTruthy()
 
@@ -169,7 +171,7 @@ describe('LineupView special events mode', () => {
     renderLineup()
 
     await user.click(screen.getByRole('button', { name: 'Special Events' }))
-    await user.click(screen.getByRole('button', { name: 'Select Event' }))
+    await user.click(screen.getByRole('heading', { name: 'VIP Showcase' }))
 
     // No assignments yet: exactly one empty pick row.
     expect(screen.getByText('Pick 1')).toBeTruthy()
@@ -192,7 +194,7 @@ describe('LineupView special events mode', () => {
     renderLineup({ hiddenNames: true })
 
     await user.click(screen.getByRole('button', { name: 'Special Events' }))
-    await user.click(screen.getByRole('button', { name: 'Select Event' }))
+    await user.click(screen.getByRole('heading', { name: 'VIP Showcase' }))
     await user.click(screen.getByRole('button', { name: 'Assign DJ #1' }))
 
     expect(screen.queryByText('DJ Alpha')).toBeNull()

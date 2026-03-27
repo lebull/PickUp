@@ -83,7 +83,9 @@ function makeProject(): Project {
   }
 }
 
-function renderResults(project: Project, submissions: Submission[], hiddenNames = false) {
+function renderResults(project: Project, submissions: Submission[], hiddenNames = false, extraContext: { setAcceptanceStatus?: ReturnType<typeof vi.fn>; replaceWithDeclineHistory?: ReturnType<typeof vi.fn> } = {}) {
+  const setAcceptanceStatus = extraContext.setAcceptanceStatus ?? vi.fn()
+  const replaceWithDeclineHistory = extraContext.replaceWithDeclineHistory ?? vi.fn()
   return render(
     <AppPreferencesContext.Provider
       value={{
@@ -102,6 +104,8 @@ function renderResults(project: Project, submissions: Submission[], hiddenNames 
           rowCountMismatch: false,
           setRowCountMismatch: vi.fn(),
           toggleDiscardSubmission: vi.fn(),
+          setAcceptanceStatus,
+          replaceWithDeclineHistory,
         }}
       >
         <ResultsList />
@@ -260,5 +264,243 @@ describe('ResultsList bulk email copy', () => {
     const specialSection = specialHeading.closest('section') as HTMLElement
     expect(within(specialSection).queryByText('DJ Special')).toBeNull()
     expect(within(specialSection).getByText('DJ #2')).toBeTruthy()
+  })
+})
+
+// ── Acceptance controls ────────────────────────────────────────────────────────
+
+describe('ResultsList acceptance controls', () => {
+  it('renders Yes and No buttons on each assigned DJ row', () => {
+    const project = makeProject()
+    const submissions = [makeSubmission('S001', 'DJ One')]
+    renderResults(project, submissions)
+    expect(screen.getByRole('button', { name: 'Mark as accepted' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Mark as declined' })).toBeTruthy()
+  })
+
+  it('calls setAcceptanceStatus with yes when Yes button is clicked', () => {
+    const setAcceptanceStatus = vi.fn()
+    const project = makeProject()
+    const submissions = [makeSubmission('S001', 'DJ One')]
+    renderResults(project, submissions, false, { setAcceptanceStatus })
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as accepted' }))
+    expect(setAcceptanceStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ stageId: 'stage-1', evening: 'Friday' }),
+      'yes'
+    )
+  })
+
+  it('calls setAcceptanceStatus with no when No button is clicked', () => {
+    const setAcceptanceStatus = vi.fn()
+    const project = makeProject()
+    const submissions = [makeSubmission('S001', 'DJ One')]
+    renderResults(project, submissions, false, { setAcceptanceStatus })
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as declined' }))
+    expect(setAcceptanceStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ stageId: 'stage-1', evening: 'Friday' }),
+      'no'
+    )
+  })
+
+  it('yes button has aria-pressed=true when acceptanceStatus is yes', () => {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001', acceptanceStatus: 'yes' },
+      ],
+    }
+    const submissions = [makeSubmission('S001', 'DJ One')]
+    renderResults(project, submissions)
+    expect(screen.getByRole('button', { name: 'Mark as accepted' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Mark as declined' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('no button has aria-pressed=true when acceptanceStatus is no', () => {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001', acceptanceStatus: 'no' },
+      ],
+    }
+    const submissions = [makeSubmission('S001', 'DJ One')]
+    renderResults(project, submissions)
+    expect(screen.getByRole('button', { name: 'Mark as declined' }).getAttribute('aria-pressed')).toBe('true')
+  })
+})
+
+// ── Replacement picker ─────────────────────────────────────────────────────────
+
+describe('ResultsList replacement picker', () => {
+  it('clicking a declined row opens the replacement picker', () => {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001', acceptanceStatus: 'no' },
+      ],
+    }
+    const submissions = [makeSubmission('S001', 'DJ Declined'), makeSubmission('S002', 'DJ Available')]
+    renderResults(project, submissions)
+    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    expect(screen.getByRole('button', { name: 'Close panel' })).toBeTruthy()
+  })
+
+  it('clicking the same declined row again closes the picker', () => {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001', acceptanceStatus: 'no' },
+      ],
+    }
+    const submissions = [makeSubmission('S001', 'DJ Declined'), makeSubmission('S002', 'DJ Available')]
+    renderResults(project, submissions)
+    // First click: opens picker (layout changes from full-width to SplitPane)
+    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    expect(screen.getByRole('button', { name: 'Close panel' })).toBeTruthy()
+    // Second click: re-query after DOM reorganization, then close
+    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    expect(screen.queryByRole('button', { name: 'Close panel' })).toBeNull()
+  })
+
+  it('selecting a DJ in the replacement picker calls replaceWithDeclineHistory', () => {
+    const replaceWithDeclineHistory = vi.fn()
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001', acceptanceStatus: 'no', declinedBy: [] },
+      ],
+    }
+    const submissions = [makeSubmission('S001', 'DJ Declined'), makeSubmission('S002', 'DJ Available')]
+    renderResults(project, submissions, false, { replaceWithDeclineHistory })
+    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Assign DJ Available' }))
+    expect(replaceWithDeclineHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ stageId: 'stage-1', evening: 'Friday' }),
+      'S002'
+    )
+  })
+
+  it('current declining DJ and declinedBy entries are excluded from the replacement picker', () => {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S002', acceptanceStatus: 'no', declinedBy: ['S001'] },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ PriorDecline'),
+      makeSubmission('S002', 'DJ Current'),
+      makeSubmission('S003', 'DJ Available'),
+    ]
+    renderResults(project, submissions)
+    fireEvent.click(screen.getByText('DJ Current').closest('button')!)
+    const panel = document.querySelector('.dj-selection-panel')!
+    expect(within(panel as HTMLElement).queryByText('DJ PriorDecline')).toBeNull()
+    expect(within(panel as HTMLElement).queryByText('DJ Current')).toBeNull()
+    expect(within(panel as HTMLElement).getByText('DJ Available')).toBeTruthy()
+  })
+})
+
+// ── Search ─────────────────────────────────────────────────────────────────────
+
+describe('ResultsList search', () => {
+  function makeMultiProject() {
+    const project: Project = {
+      ...makeProject(),
+      assignments: [
+        { type: 'dj', stageId: 'stage-1', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001' },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ Wren', { furName: 'WolfyMc', contactEmail: 'wren@test.com', telegramDiscord: '@wrenny', phone: '555-0001' }),
+      makeSubmission('S002', 'DJ Raven', { contactEmail: 'raven@test.com' }),
+    ]
+    return { project, submissions }
+  }
+
+  it('shows a search input at the top of the results list', () => {
+    const { project, submissions } = makeMultiProject()
+    renderResults(project, submissions)
+    expect(screen.getByRole('searchbox', { name: 'Search DJs' })).toBeTruthy()
+  })
+
+  it('filters DJ rows by DJ name', () => {
+    const { project, submissions } = makeMultiProject()
+    renderResults(project, submissions)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Wren' } })
+    expect(screen.queryByText('DJ Wren')).toBeTruthy()
+    expect(screen.queryByText('DJ Raven')).toBeNull()
+  })
+
+  it('filters by furry name', () => {
+    const { project, submissions } = makeMultiProject()
+    renderResults(project, submissions)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'WolfyMc' } })
+    expect(screen.queryByText('DJ Wren')).toBeTruthy()
+    expect(screen.queryByText('DJ Raven')).toBeNull()
+  })
+
+  it('filters by email', () => {
+    const { project, submissions } = makeMultiProject()
+    renderResults(project, submissions)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'raven@test.com' } })
+    expect(screen.queryByText('DJ Raven')).toBeTruthy()
+    expect(screen.queryByText('DJ Wren')).toBeNull()
+  })
+
+  it('keeps stage section headings visible when all rows are filtered', () => {
+    const { project, submissions } = makeMultiProject()
+    renderResults(project, submissions)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzznomatch' } })
+    expect(screen.getByRole('heading', { name: /Main Stage/ })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Did Not Make the Cut' })).toBeTruthy()
+  })
+
+  it('clears filter when search is emptied', () => {
+    const { project, submissions } = makeMultiProject()
+    renderResults(project, submissions)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Wren' } })
+    expect(screen.queryByText('DJ Raven')).toBeNull()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+    expect(screen.getByText('DJ Raven')).toBeTruthy()
+  })
+})
+
+// ── Day grouping ───────────────────────────────────────────────────────────────
+
+describe('ResultsList day grouping', () => {
+  it('renders a day heading for each active evening within a stage section', () => {
+    const multiDayStage: Stage = {
+      id: 'stage-multi',
+      name: 'Multi Day Stage',
+      stageType: 'sequential',
+      activeDays: ['Friday', 'Saturday'],
+      schedule: {
+        Friday: [{ startTime: '20:00', endTime: '22:00' }],
+        Saturday: [{ startTime: '20:00', endTime: '22:00' }],
+      },
+      slotDuration: 60,
+    }
+    const project: Project = {
+      ...makeProject(),
+      stages: [multiDayStage],
+      assignments: [
+        { type: 'dj', stageId: 'stage-multi', evening: 'Friday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S001' },
+        { type: 'dj', stageId: 'stage-multi', evening: 'Saturday', slotIndex: 0, eventIndex: 0, submissionNumber: 'S002' },
+      ],
+    }
+    const submissions = [
+      makeSubmission('S001', 'DJ Friday'),
+      makeSubmission('S002', 'DJ Saturday'),
+    ]
+    renderResults(project, submissions)
+    expect(screen.getByRole('heading', { name: 'Friday' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Saturday' })).toBeTruthy()
+  })
+
+  it('renders a day heading even when a stage has only one active day', () => {
+    const project = makeProject()
+    const submissions = [makeSubmission('S001', 'DJ One')]
+    renderResults(project, submissions)
+    expect(screen.getByRole('heading', { name: 'Friday' })).toBeTruthy()
   })
 })

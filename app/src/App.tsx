@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Routes, Route, Navigate, NavLink, Outlet, useParams, Link } from 'react-router-dom'
 import './App.css'
 import { parseSubmissions } from './loadSubmissions.ts'
-import type { Submission, Project } from './types.ts'
+import type { Submission, Project, SlotCoord } from './types.ts'
 import { ProjectList } from './components/ProjectList.tsx'
 import { ProjectCreate } from './components/ProjectCreate.tsx'
 import { SubmissionsView } from './components/SubmissionsView.tsx'
 import { LineupView } from './components/LineupView.tsx'
 import { ResultsList } from './components/ResultsList.tsx'
-import { getProject, saveProject } from './projectStore.ts'
+import { getProject, saveProject, applySetAcceptanceStatus, applyReplaceWithDeclineHistory } from './projectStore.ts'
 import { ProjectContext } from './ProjectContext.ts'
 import { AppPreferencesContext, useAppPreferencesState } from './AppPreferencesContext.ts'
 import { NavActionsMenu } from './components/NavActionsMenu.tsx'
@@ -94,6 +94,20 @@ function ProjectWorkspace() {
     await saveProject(updated)
   }
 
+  function handleSetAcceptanceStatus(slotCoord: SlotCoord, status: 'pending' | 'yes' | 'no') {
+    if (!project) return
+    const updated = applySetAcceptanceStatus(project, slotCoord, status)
+    setProject(updated)
+    saveProject(updated)
+  }
+
+  function handleReplaceWithDeclineHistory(slotCoord: SlotCoord, newSubmissionNumber: string) {
+    if (!project) return
+    const updated = applyReplaceWithDeclineHistory(project, slotCoord, newSubmissionNumber)
+    setProject(updated)
+    saveProject(updated)
+  }
+
   function handleToggleDiscard(submissionNumber: string) {
     if (!project) return
     const current = project.discardedSubmissions ?? []
@@ -128,7 +142,7 @@ function ProjectWorkspace() {
   }
 
   return (
-    <ProjectContext.Provider value={{ project, setProject, submissions, setSubmissions, rowCountMismatch, setRowCountMismatch, toggleDiscardSubmission: handleToggleDiscard }}>
+    <ProjectContext.Provider value={{ project, setProject, submissions, setSubmissions, rowCountMismatch, setRowCountMismatch, toggleDiscardSubmission: handleToggleDiscard, setAcceptanceStatus: handleSetAcceptanceStatus, replaceWithDeclineHistory: handleReplaceWithDeclineHistory }}>
       <div className="app">
         <header className="app-header">
           <Link to="/" className="back-link">← Projects</Link>
