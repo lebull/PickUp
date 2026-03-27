@@ -464,35 +464,6 @@ export function ResultsList() {
         </>
       )}
 
-      {/* Did Not Make the Cut */}
-      {rejectionList.length > 0 && (
-        <section className="results-stage-section results-rejection-section">
-          <div className="results-stage-heading-row">
-            <h2 className="results-stage-heading results-rejection-heading">
-              Did Not Make the Cut
-            </h2>
-            <button
-              type="button"
-              className="results-copy-stage-btn"
-              onClick={() => handleOpenEmailModal('Did Not Make the Cut', rejectionList)}
-            >
-              Copy emails
-            </button>
-          </div>
-          <div className="results-dj-list">
-            {rejectionList.map(({ submission: s }) => (
-              <DJRowItem
-                key={s.submissionNumber}
-                row={{ submission: s }}
-                displayName={getDisplayName(s)}
-                isSelected={selectedSubmission?.submissionNumber === s.submissionNumber}
-                onClick={handleSelectDJ}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {specialEventSections.length > 0 && (
         <section className="results-stage-section results-special-events-section">
           <div className="results-stage-heading-row">
@@ -523,6 +494,35 @@ export function ResultsList() {
               </div>
             </section>
           ))}
+        </section>
+      )}
+
+      {/* Did Not Make the Cut */}
+      {rejectionList.length > 0 && (
+        <section className="results-stage-section results-rejection-section">
+          <div className="results-stage-heading-row">
+            <h2 className="results-stage-heading results-rejection-heading">
+              Did Not Make the Cut
+            </h2>
+            <button
+              type="button"
+              className="results-copy-stage-btn"
+              onClick={() => handleOpenEmailModal('Did Not Make the Cut', rejectionList)}
+            >
+              Copy emails
+            </button>
+          </div>
+          <div className="results-dj-list">
+            {rejectionList.map(({ submission: s }) => (
+              <DJRowItem
+                key={s.submissionNumber}
+                row={{ submission: s }}
+                displayName={getDisplayName(s)}
+                isSelected={selectedSubmission?.submissionNumber === s.submissionNumber}
+                onClick={handleSelectDJ}
+              />
+            ))}
+          </div>
         </section>
       )}
     </div>

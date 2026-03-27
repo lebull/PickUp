@@ -171,7 +171,7 @@ describe('ResultsList bulk email copy', () => {
     expect(textarea.value).not.toContain('rejected@example.com')
   })
 
-  it('renders special-event picks below rejection and keeps them out of the rejection list', () => {
+  it('renders special-event picks above rejection and keeps them out of the rejection list', () => {
     const specialStage: Stage = {
       id: 'stage-special',
       name: 'Partner Stage',
@@ -209,7 +209,7 @@ describe('ResultsList bulk email copy', () => {
 
     const rejectionHeading = screen.getByRole('heading', { name: 'Did Not Make the Cut' })
     const specialHeading = screen.getByRole('heading', { name: 'Special Events' })
-    expect(rejectionHeading.compareDocumentPosition(specialHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(specialHeading.compareDocumentPosition(rejectionHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     const rejectionSection = rejectionHeading.closest('section') as HTMLElement
     expect(within(rejectionSection).queryByText('DJ Special')).toBeNull()
