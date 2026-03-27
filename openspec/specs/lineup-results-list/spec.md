@@ -1,57 +1,23 @@
 ## ADDED Requirements
 
-### Requirement: Blank-assigned slots appear in the accepted section with their label
-The Results view SHALL include blank-assigned slots in the accepted section alongside DJ entries. For each stage section, blank assignments SHALL appear as entries displaying the assignment's `blankLabel` (defaulting to `"Blocked"` if absent) as the display name, the slot time (for sequential) or position label (for simultaneous), and no contact or scoring information.
+### Requirement: Results list shows special-event selections below rejection list
+The Results view SHALL include special-event DJ selections in a dedicated section rendered below "Did Not Make the Cut". Special-event entries SHALL not be included in the rejection section.
 
-#### Scenario: Blank assignment appears in stage results section
-- **WHEN** a sequential slot has a blank assignment with `blankLabel: 'Opening Ceremony'`
-- **THEN** it SHALL appear in that stage's section in the Results view
-- **THEN** the entry SHALL display `"Opening Ceremony"` as the label
-- **THEN** the entry SHALL display the slot time
-- **THEN** no contact email, Telegram/Discord, genre, or format/gear SHALL be shown for that entry
+#### Scenario: Results order places special-event section below rejection section
+- **WHEN** the Results view contains rejected DJs and at least one special-event selection
+- **THEN** the "Did Not Make the Cut" section SHALL render before the special-events section
+- **THEN** the special-events section SHALL be the next section after rejection content
 
-#### Scenario: Blank assignment with no label displays default
-- **WHEN** a blank assignment has no `blankLabel`
-- **THEN** the Results view SHALL display `"Blocked"` as the label for that entry
+#### Scenario: Special-event entries are excluded from rejection list
+- **WHEN** a DJ is assigned to a special event
+- **THEN** that DJ SHALL appear in the special-events section
+- **THEN** that DJ SHALL NOT appear in "Did Not Make the Cut" solely because of special-event assignment
 
-#### Scenario: Blank assignments are excluded from the rejection section
-- **WHEN** a slot has a blank assignment
-- **THEN** that blank assignment SHALL NOT appear in the "Did Not Make the Cut" section
-- **THEN** the blank assignment SHALL NOT be counted as an unassigned or discarded submission
+### Requirement: Special-event result entries use DJ identity fields consistent with lineup results
+Each special-event result entry SHALL display the DJ name using existing hidden-name behavior and SHALL include available contact fields consistent with other result entries.
 
-### Requirement: Rejection section supports bulk email copy
-The Results view SHALL provide a bulk email copy action for the "Did Not Make the Cut" section that copies email addresses for rejected DJs shown in that section.
+Special-event entries SHALL NOT require or imply a day-based slot label.
 
-#### Scenario: Copy action appears for rejected DJs
-- **WHEN** the Results view displays the "Did Not Make the Cut" section
-- **THEN** that section SHALL include a "Copy emails" action in its heading area
-
-#### Scenario: Copy action opens rejection email list
-- **WHEN** the user activates the "Copy emails" action for the "Did Not Make the Cut" section
-- **THEN** the Results view SHALL open the same email-copy modal pattern used by accepted stage sections
-- **THEN** the modal SHALL contain a comma-separated list of contact email addresses for DJs in the rejection section
-
-#### Scenario: Rejection copy excludes non-rejected or missing emails
-- **WHEN** the rejection email list is prepared for copy
-- **THEN** it SHALL include only DJs currently listed in the "Did Not Make the Cut" section
-- **THEN** entries with empty contact email values SHALL be excluded from the copied email list
-
-## MODIFIED Requirements
-
-### Requirement: Accepted DJs are listed grouped by stage
-The Results view SHALL display a section for each stage that has at least one assigned DJ or blank assignment. Each section SHALL use the stage name as a heading. Within each stage section, assigned DJs SHALL be listed with: DJ name, contact email, Telegram/Discord, genre, and format/gear. Blank-assigned slots SHALL be listed with the assignment's `blankLabel` (defaulting to `"Blocked"`) and the slot time, without contact or scoring fields.
-
-#### Scenario: Each stage with assignments has its own section
-- **WHEN** the lineup has assignments (DJ or blank) across one or more stages
-- **THEN** the Results view SHALL render one section per stage that has at least one assigned DJ or blank slot
-- **THEN** stages SHALL be ordered according to the stage order in `project.stages`
-
-#### Scenario: Each accepted DJ entry shows contact info and secondary fields
-- **WHEN** an assigned DJ entry is displayed
-- **THEN** the DJ name SHALL be the primary label
-- **THEN** contact email and Telegram/Discord SHALL be prominently visible
-- **THEN** genre and format/gear SHALL be displayed as secondary info
-
-#### Scenario: Empty state when no assignments exist
-- **WHEN** no DJs or blank slots have been assigned to any position in the project
-- **THEN** the Results view SHALL display an informational message indicating no lineup has been built yet
+#### Scenario: Hidden-name mode applies to special-event entries
+- **WHEN** hidden-name mode is enabled and a DJ appears in the special-events section
+- **THEN** the entry SHALL display that DJ's anonymized identifier instead of legal name
