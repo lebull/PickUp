@@ -536,16 +536,6 @@ export function LineupView() {
                           <h3>{stage.stageName}</h3>
                           <p>Open-ended DJ picks</p>
                         </div>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-small"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            selectSpecialStage(stage.stageId)
-                          }}
-                        >
-                          Select Event
-                        </button>
                       </div>
                       <div className="special-events-list">
                         {stage.assignments.length === 0 ? (
