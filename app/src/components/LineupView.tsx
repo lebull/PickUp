@@ -110,6 +110,7 @@ export function LineupView() {
   }, [project.stages, slotAssignments])
 
   function getDisplayName(submissionNumber: string): string {
+    if (!submissions) return submissionNumber
     const idx = submissions.findIndex((s) => s.submissionNumber === submissionNumber)
     if (hiddenNames) return idx >= 0 ? `DJ #${idx + 1}` : submissionNumber
     return submissions[idx]?.djName ?? submissionNumber

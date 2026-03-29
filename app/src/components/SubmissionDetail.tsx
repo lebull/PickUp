@@ -230,11 +230,7 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
         </Section>
       )}
 
-      {false ? (
-        <>{moonlightSection}{mainScoreSection}</>
-      ) : (
-        <>{mainScoreSection}{moonlightSection}</>
-      )}
+      {<>{mainScoreSection}{moonlightSection}</>}
     </div>
   )
 }

@@ -55,7 +55,8 @@ export function StageGrid({
   const activeDays = useMemo(() => {
     if (!stage) return []
     return CONVENTION_ORDER.filter((d) => (stage.activeDays ?? []).includes(d))
-  }, [stage])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage?.id, stage?.activeDays])
 
   // Unified time slot row axis across all active days (union, sorted chronologically)
   const slotRows = useMemo(() => {
@@ -74,7 +75,8 @@ export function StageGrid({
       const bs2 = bm < 360 ? bm + 1440 : bm
       return as2 - bs2
     })
-  }, [stage, activeDays, isSimultaneous])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage?.id, activeDays, isSimultaneous])
 
   function getAssignment(evening: string, slotIndex: number): SlotAssignment | undefined {
     return assignments.find(

@@ -84,8 +84,8 @@ function makeProject(): Project {
 }
 
 function renderResults(project: Project, submissions: Submission[], hiddenNames = false, extraContext: { setAcceptanceStatus?: ReturnType<typeof vi.fn>; replaceWithDeclineHistory?: ReturnType<typeof vi.fn> } = {}) {
-  const setAcceptanceStatus = extraContext.setAcceptanceStatus ?? vi.fn()
-  const replaceWithDeclineHistory = extraContext.replaceWithDeclineHistory ?? vi.fn()
+  const setAcceptanceStatus = (extraContext.setAcceptanceStatus ?? vi.fn()) as (slotCoord: import('../types').SlotCoord, status: 'pending' | 'yes' | 'no') => void
+  const replaceWithDeclineHistory = (extraContext.replaceWithDeclineHistory ?? vi.fn()) as (slotCoord: import('../types').SlotCoord, newSubmissionNumber: string) => void
   return render(
     <AppPreferencesContext.Provider
       value={{
