@@ -12,6 +12,7 @@ import { getProject, saveProject, applySetAcceptanceStatus, applyReplaceWithDecl
 import { ProjectContext } from './ProjectContext.ts'
 import { AppPreferencesContext, useAppPreferencesState } from './AppPreferencesContext.ts'
 import { NavActionsMenu } from './components/NavActionsMenu.tsx'
+import { AuthGate } from './components/AuthGate.tsx'
 
 // ── Project Workspace ────────────────────────────────────────────────────────
 
@@ -196,6 +197,7 @@ function App() {
   const prefs = useAppPreferencesState()
   return (
     <AppPreferencesContext.Provider value={prefs}>
+      <AuthGate>
       <Routes>
         <Route path="/" element={<ProjectList />} />
         <Route path="/new" element={<ProjectCreate />} />
@@ -208,6 +210,7 @@ function App() {
           <Route path="results" element={<ResultsList />} />
         </Route>
       </Routes>
+      </AuthGate>
     </AppPreferencesContext.Provider>
   )
 }

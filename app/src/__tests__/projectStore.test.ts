@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { normalizeProject, applySetAcceptanceStatus, applyReplaceWithDeclineHistory } from '../projectStore'
 import type { Project, SlotCoord } from '../types'
+
+vi.mock('../firebase', () => ({ auth: { currentUser: null }, db: {} }))
 
 function makeBaseProject(): Project {
   return {

@@ -1,23 +1,12 @@
-import { openDB } from 'idb'
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore'
+import { auth, db } from './firebase'
 import type { Project, SlotAssignment, Assignment, SlotCoord, DJSlotAssignment } from './types'
 import { isSlotAssignment, isBlankAssignment, isSimultaneousCoord } from './types'
 
-const DB_NAME = 'pickup-lineups'
-const STORE_NAME = 'projects'
-const DB_VERSION = 2
-
-function getDB() {
-  return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
-      // Drop the old filename-keyed lineups store if it exists
-      if (oldVersion < 2 && db.objectStoreNames.contains('lineups')) {
-        db.deleteObjectStore('lineups')
-      }
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-    },
-  })
+function projectsCol() {
+  const uid = auth.currentUser?.uid
+  if (!uid) throw new Error('Not signed in.')
+  return collection(db, 'users', uid, 'projects')
 }
 
 export async function createProject(name: string): Promise<Project> {
@@ -33,8 +22,7 @@ export async function createProject(name: string): Promise<Project> {
     createdAt: now,
     updatedAt: now,
   }
-  const db = await getDB()
-  await db.put(STORE_NAME, project, project.id)
+  await setDoc(doc(projectsCol(), project.id), project)
   return project
 }
 
@@ -104,14 +92,13 @@ export function normalizeProject(project: Project): Project {
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  const db = await getDB()
-  const project: Project | undefined = await db.get(STORE_NAME, id)
-  return project ? normalizeProject(project) : null
+  const snap = await getDoc(doc(projectsCol(), id))
+  return snap.exists() ? normalizeProject(snap.data() as Project) : null
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const db = await getDB()
-  const all: Project[] = await db.getAll(STORE_NAME)
+  const snap = await getDocs(projectsCol())
+  const all = snap.docs.map((d) => d.data() as Project)
   return all
     .map(normalizeProject)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -119,13 +106,11 @@ export async function listProjects(): Promise<Project[]> {
 
 export async function saveProject(project: Project): Promise<void> {
   const updated: Project = { ...project, updatedAt: new Date().toISOString() }
-  const db = await getDB()
-  await db.put(STORE_NAME, updated, updated.id)
+  await setDoc(doc(projectsCol(), updated.id), updated)
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const db = await getDB()
-  await db.delete(STORE_NAME, id)
+  await deleteDoc(doc(projectsCol(), id))
 }
 
 export function exportProject(project: Project): void {
