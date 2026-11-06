@@ -46,6 +46,13 @@ export function ProjectList() {
           <button
             type="button"
             className="btn-secondary"
+            onClick={() => navigate('/admin/users')}
+          >
+            Manage Users
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
             onClick={() => importInputRef.current?.click()}
           >
             Import Project

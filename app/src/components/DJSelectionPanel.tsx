@@ -302,14 +302,15 @@ export function DJSelectionPanel({
 
   const [scorePeek, setScorePeek] = useState<{ sub: Submission; rect: DOMRect } | null>(null)
 
-  // Reset focus stage and availability filter when evening changes.
-  const [lastEvening, setLastEvening] = useState(effectiveEvening)
+  // Reset focus stage and availability filter when stage/day context changes.
+  const contextKey = `${activeSlot?.stageId ?? 'none'}|${effectiveEvening}`
+  const [lastContextKey, setLastContextKey] = useState(contextKey)
   useEffect(() => {
-    if (effectiveEvening === lastEvening) return
-    setLastEvening(effectiveEvening)
+    if (contextKey === lastContextKey) return
+    setLastContextKey(contextKey)
     setFocusStage(null)
-    setShowAvailableOnly(false)
-  }, [effectiveEvening, lastEvening])
+    setShowAvailableOnly(true)
+  }, [contextKey, lastContextKey])
 
   // For sequential slots: the currently assigned DJ for this exact slot
   const currentAssignment = (isSimultaneous || !activeSlot)

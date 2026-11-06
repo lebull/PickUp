@@ -378,3 +378,85 @@ describe('DJSelectionPanel — excludedSubmissionNumbers', () => {
     expect(screen.getByRole('button', { name: 'Assign DJ Beta' })).toBeTruthy()
   })
 })
+
+describe('DJSelectionPanel — available-only default behavior', () => {
+  it('resets Available only to enabled when switching stage/day context', async () => {
+    const user = userEvent.setup()
+
+    const fridayOnly = makeSubmission('S201', 'DJ Friday', { daysAvailable: 'Friday' })
+    const saturdayOnly = makeSubmission('S202', 'DJ Saturday', { daysAvailable: 'Saturday' })
+
+    const secondStage: Stage = {
+      id: 'stage2',
+      name: 'Second Stage',
+      stageType: 'sequential',
+      activeDays: ['Friday'],
+      schedule: {
+        Friday: [{ startTime: '20:00', endTime: '22:00' }],
+      },
+      slotDuration: 60,
+    }
+
+    const { rerender } = render(
+      <Wrapper>
+        <DJSelectionPanel
+          submissions={[fridayOnly, saturdayOnly]}
+          stages={[testStage, secondStage]}
+          assignments={[]}
+          discardedSubmissionNumbers={new Set()}
+          activeSlot={activeSlot}
+          currentEvening="Friday"
+          onAssign={vi.fn()}
+          onRemove={vi.fn()}
+          onAddSimultaneous={vi.fn()}
+          onRemoveSimultaneous={vi.fn()}
+          onAssignBlank={vi.fn()}
+          onAddBlankSimultaneous={vi.fn()}
+          onPositionSelect={vi.fn()}
+          onSelectSlot={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    // Default: available-only is enabled, so Saturday-only DJ is hidden.
+    expect(screen.queryByRole('button', { name: 'Assign DJ Saturday' })).toBeNull()
+
+    // Turn the filter off.
+    await user.click(screen.getByRole('button', { name: 'Available only' }))
+    expect(screen.getByRole('button', { name: 'Assign DJ Saturday' })).toBeTruthy()
+
+    // Switch context to another stage on the same day; filter should reset ON.
+    const stage2Slot: ActiveSlot = {
+      stageId: 'stage2',
+      evening: 'Friday',
+      slotIndex: 0,
+      eventIndex: 0,
+      timeLabel: '20:00',
+    }
+
+    rerender(
+      <Wrapper>
+        <DJSelectionPanel
+          submissions={[fridayOnly, saturdayOnly]}
+          stages={[testStage, secondStage]}
+          assignments={[]}
+          discardedSubmissionNumbers={new Set()}
+          activeSlot={stage2Slot}
+          currentEvening="Friday"
+          onAssign={vi.fn()}
+          onRemove={vi.fn()}
+          onAddSimultaneous={vi.fn()}
+          onRemoveSimultaneous={vi.fn()}
+          onAssignBlank={vi.fn()}
+          onAddBlankSimultaneous={vi.fn()}
+          onPositionSelect={vi.fn()}
+          onSelectSlot={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    expect(screen.queryByRole('button', { name: 'Assign DJ Saturday' })).toBeNull()
+  })
+})

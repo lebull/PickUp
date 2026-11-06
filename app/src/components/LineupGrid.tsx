@@ -1,10 +1,20 @@
 import { useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventType, getProjectDayNames, getScheduleEventsForDay } from '../lineupUtils.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventType, getProjectDayNames, getScheduleEventsForDay, timeToMinutes } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { hexToTint } from '../stageColors.ts'
+import { getReadableTextColor, hexToTint } from '../stageColors.ts'
 import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
+import { SequentialSlotCell } from './SequentialSlotCell.tsx'
+
+interface SequentialSlotSpan {
+  eventIndex: number
+  slotIndex: number
+  timeLabel: string
+  startRowIndex: number
+  endRowIndex: number
+}
 
 interface Props {
   submissions: Submission[]
@@ -89,6 +99,80 @@ export function LineupGrid({
     () => eveningStages.filter((s) => s.stageType === 'simultaneous'),
     [eveningStages]
   )
+
+  const timeAxisIndexByLabel = useMemo(() => {
+    const map = new Map<string, number>()
+    timeAxis.forEach((label, idx) => map.set(label, idx))
+    return map
+  }, [timeAxis])
+
+  const axisSortableMinutes = useMemo(
+    () => timeAxis.map((label) => {
+      const m = timeToMinutes(label)
+      return m < 360 ? m + 1440 : m
+    }),
+    [timeAxis]
+  )
+
+  const sequentialLayouts = useMemo(() => {
+    const layouts = new Map<string, {
+      hasTimedEvents: boolean
+      spansByStartRow: Map<number, SequentialSlotSpan>
+      coveredRows: Set<number>
+    }>()
+
+    function getAxisIndexAtOrAfter(label: string): number {
+      const direct = timeAxisIndexByLabel.get(label)
+      if (direct != null) return direct
+      const mRaw = timeToMinutes(label)
+      const target = mRaw < 360 ? mRaw + 1440 : mRaw
+      const idx = axisSortableMinutes.findIndex((m) => m >= target)
+      return idx === -1 ? timeAxis.length : idx
+    }
+
+    for (const stage of eveningStages) {
+      if (stage.stageType === 'simultaneous') continue
+
+      const timedEvents = getScheduleEventsForDay(stage.schedule, evening)
+        .filter((event) => getStageEventType(event) !== 'special')
+      const spansByStartRow = new Map<number, SequentialSlotSpan>()
+      const coveredRows = new Set<number>()
+
+      timedEvents.forEach((event, eventIndex) => {
+        const labels = getSlotLabels(stage, evening, eventIndex)
+        if (labels.length === 0) return
+
+        labels.forEach((slotLabel, slotIndex) => {
+          const startRowIndex = timeAxisIndexByLabel.get(slotLabel)
+          if (startRowIndex == null) return
+
+          const nextBoundary = labels[slotIndex + 1] ?? event.endTime ?? null
+          let endRowIndex = nextBoundary ? getAxisIndexAtOrAfter(nextBoundary) : startRowIndex + 1
+          if (endRowIndex <= startRowIndex) endRowIndex = startRowIndex + 1
+
+          const span: SequentialSlotSpan = {
+            eventIndex,
+            slotIndex,
+            timeLabel: slotLabel,
+            startRowIndex,
+            endRowIndex,
+          }
+          spansByStartRow.set(startRowIndex, span)
+          for (let row = startRowIndex; row < endRowIndex; row++) {
+            coveredRows.add(row)
+          }
+        })
+      })
+
+      layouts.set(stage.id, {
+        hasTimedEvents: timedEvents.length > 0,
+        spansByStartRow,
+        coveredRows,
+      })
+    }
+
+    return layouts
+  }, [axisSortableMinutes, evening, eveningStages, timeAxis, timeAxisIndexByLabel])
 
   // Map stage id → hex color (or undefined) for quick lookup during render
   const stageColorMap = useMemo(() => {
@@ -411,17 +495,9 @@ export function LineupGrid({
                       )
                     }
 
-                    // Sequential stage: find which event (if any) owns this time label.
-                    const dayEvents = getScheduleEventsForDay(stage.schedule, evening)
-                    let eventIndex = -1
-                    let slotIndex = -1
-                    for (let ei = 0; ei < dayEvents.length; ei++) {
-                      const labels = getSlotLabels(stage, evening, ei)
-                      const si = labels.indexOf(timeLabel)
-                      if (si !== -1) { eventIndex = ei; slotIndex = si; break }
-                    }
-
-                    if (dayEvents.length === 0) {
+                    // Sequential stage: render spanning slots so there are no fake in-slot gaps.
+                    const layout = sequentialLayouts.get(stage.id)
+                    if (!layout || !layout.hasTimedEvents) {
                       return (
                         <div
                           key={`${stage.id}-${timeLabel}`}
@@ -430,7 +506,9 @@ export function LineupGrid({
                       )
                     }
 
-                    if (slotIndex === -1) {
+                    const span = layout.spansByStartRow.get(rowIndex)
+                    if (!span) {
+                      if (layout.coveredRows.has(rowIndex)) return null
                       return (
                         <div
                           key={`${stage.id}-${timeLabel}`}
@@ -438,6 +516,8 @@ export function LineupGrid({
                         />
                       )
                     }
+
+                    const { eventIndex, slotIndex, timeLabel: slotTimeLabel, endRowIndex } = span
 
                     const assignment = getAssignment(stage.id, eventIndex, slotIndex)
                     const slotKey = `${stage.id}|${evening}|${eventIndex}|${slotIndex}`
@@ -460,77 +540,45 @@ export function LineupGrid({
                     const submissionNumber = assignment && !isBlankAssignment(assignment) ? assignment.submissionNumber : null
                     const isDragOver = dragOverKey === slotKey
                     const canPeek = !!submission && hasAnyScore(submission, useMoonlight)
-                    return assignment ? (
-                      <button
-                        key={`${stage.id}-${timeLabel}`}
-                        type="button"
-                        className={`grid-cell grid-slot ${isBlank ? 'grid-slot--blank' : 'grid-slot--occupied'}${isActive ? ' grid-slot--active' : ''}${isDragOver ? ' grid-slot--drag-over' : ''}${isUnavailable ? ' grid-slot--availability-error' : ''}`}
-                        style={!isBlank && stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
-                        title={isUnavailable ? `Available: ${submission!.daysAvailable}` : undefined}
-                        draggable={!isBlank}
-                        onDragStart={!isBlank && submissionNumber ? (e) => {
-                          e.dataTransfer.setData('application/dj-slot-key', JSON.stringify({ stageId: stage.id, evening, slotIndex, eventIndex }))
-                          e.dataTransfer.setData('application/dj-submission-number', submissionNumber)
-                          e.dataTransfer.effectAllowed = 'move'
-                        } : undefined}
-                        onDragEnter={(e) => { e.preventDefault(); setDragOverKey(slotKey) }}
-                        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null) }}
-                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-                        onDrop={(e) => {
-                          e.preventDefault()
-                          setDragOverKey(null)
-                          const slotKeyData = e.dataTransfer.getData('application/dj-slot-key')
-                          if (slotKeyData) {
-                            onMoveAssignment(JSON.parse(slotKeyData) as SlotCoord, { stageId: stage.id, evening, slotIndex, eventIndex })
-                          } else {
-                            const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                            if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
-                          }
-                        }}
-                        onMouseEnter={canPeek && submission ? (e) => setGridPeek({ sub: submission, rect: e.currentTarget.getBoundingClientRect(), useMoonlight }) : undefined}
-                        onMouseLeave={canPeek ? () => setGridPeek(null) : undefined}
-                        onClick={() =>
-                          onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
-                        }
-                      >
-                        {assignedLabel}
-                        {!isBlank && genre && <span className="slot-genre">{genre}</span>}
-                        {!isBlank && (
-                          <button
-                            type="button"
-                            className="slot-remove-btn"
-                            title="Remove DJ"
-                            onClick={(e) => { e.stopPropagation(); onRemove(stage.id, evening, slotIndex, eventIndex) }}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </button>
-                    ) : (
-                      <button
-                        key={`${stage.id}-${timeLabel}`}
-                        type="button"
-                        className={`grid-cell grid-slot grid-slot--empty${isActive ? ' grid-slot--active' : ''}${dragOverKey === slotKey ? ' grid-slot--drag-over' : ''}`}
-                        onClick={() =>
-                          onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel })
-                        }
-                        onDragEnter={(e) => { e.preventDefault(); setDragOverKey(slotKey) }}
-                        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null) }}
-                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-                        onDrop={(e) => {
-                          e.preventDefault()
-                          setDragOverKey(null)
-                          const slotKeyData = e.dataTransfer.getData('application/dj-slot-key')
-                          if (slotKeyData) {
-                            onMoveAssignment(JSON.parse(slotKeyData) as SlotCoord, { stageId: stage.id, evening, slotIndex, eventIndex })
-                          } else {
-                            const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                            if (subNum) onAssign(stage.id, evening, slotIndex, subNum, eventIndex)
-                          }
-                        }}
-                      >
-                        +
-                      </button>
+                    const readableTextColor = stageColor ? getReadableTextColor(stageColor) : undefined
+                    const slotStyle = !isBlank && stageColor
+                      ? {
+                        gridColumn: cssCol,
+                        gridRow: `${rowIndex + 2} / ${endRowIndex + 2}`,
+                        backgroundColor: hexToTint(stageColor, 0.25),
+                        color: readableTextColor,
+                        '--slot-genre-color': readableTextColor === '#0f172a' ? '#334155' : '#dbeafe',
+                      } as CSSProperties
+                      : {
+                        gridColumn: cssCol,
+                        gridRow: `${rowIndex + 2} / ${endRowIndex + 2}`,
+                      }
+
+                    return (
+                      <SequentialSlotCell
+                        key={slotKey}
+                        slotKey={slotKey}
+                        stageId={stage.id}
+                        evening={evening}
+                        eventIndex={eventIndex}
+                        slotIndex={slotIndex}
+                        assignedLabel={assignedLabel}
+                        isBlank={isBlank}
+                        isActive={isActive}
+                        isDragOver={isDragOver}
+                        isUnavailable={isUnavailable}
+                        unavailableTitle={submission ? `Available: ${submission.daysAvailable}` : undefined}
+                        genre={genre}
+                        submissionNumber={submissionNumber}
+                        style={slotStyle}
+                        onSetDragOver={setDragOverKey}
+                        onMoveAssignment={onMoveAssignment}
+                        onAssignSubmission={(subNum) => onAssign(stage.id, evening, slotIndex, subNum, eventIndex)}
+                        onSlotClick={() => onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel: slotTimeLabel })}
+                        onRemove={!isBlank ? () => onRemove(stage.id, evening, slotIndex, eventIndex) : undefined}
+                        onPeekEnter={canPeek && submission ? (rect) => setGridPeek({ sub: submission, rect, useMoonlight }) : undefined}
+                        onPeekLeave={canPeek ? () => setGridPeek(null) : undefined}
+                      />
                     )
                   })}
                 </>
@@ -619,7 +667,11 @@ function SimultaneousCell({
       onClick={onCellClick}
       onDragEnter={(e) => { e.preventDefault(); if (!isFull) setIsDragOver(true) }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false) }}
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = isFull ? 'none' : 'move' }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = isFull ? 'none' : 'move'
+        if (!isFull && !isDragOver) setIsDragOver(true)
+      }}
       onDrop={(e) => {
         e.preventDefault()
         setIsDragOver(false)
@@ -658,7 +710,11 @@ function SimultaneousCell({
               type="button"
               className="simultaneous-dj-remove"
               title="Remove DJ"
-              onClick={(e) => { e.stopPropagation(); onRemove(a.positionIndex as 1 | 2 | 3) }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onPeekLeave?.()
+                onRemove(a.positionIndex as 1 | 2 | 3)
+              }}
             >
               ×
             </button>

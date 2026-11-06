@@ -57,20 +57,13 @@ function makeSequentialStage(
 }
 
 describe('getEveningTimeAxis – multi-event stages', () => {
-  it('produces a continuous axis spanning two non-overlapping events on the same stage', () => {
+  it('uses a continuous GCF axis with explicit event boundaries', () => {
     const stage = makeSequentialStage('disco', [
       { startTime: '14:00', endTime: '18:00' },
       { startTime: '20:00', endTime: '24:00' },
     ])
     const axis = getEveningTimeAxis([stage], 'Friday')
-    // Should span 14:00–18:00 and 20:00–24:00 in one unified axis
-    expect(axis).toContain('14:00')
-    expect(axis).toContain('17:00')
-    expect(axis).toContain('20:00')
-    expect(axis).toContain('23:00')
-    // Gap hours between events should also be present (continuous axis)
-    expect(axis).toContain('18:00')
-    expect(axis).toContain('19:00')
+    expect(axis).toEqual(['14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00', '24:00'])
   })
 
   it('getSlotLabels returns slots only for the specified eventIndex', () => {
@@ -99,13 +92,13 @@ describe('getEveningTimeAxis – multi-event stages', () => {
   it('single-event stage behaves identically to before', () => {
     const stage = makeSequentialStage('main', [{ startTime: '20:00', endTime: '24:00' }])
     expect(getSlotLabels(stage, 'Friday', 0)).toEqual(['20:00', '21:00', '22:00', '23:00'])
-    expect(getEveningTimeAxis([stage], 'Friday')).toEqual(['20:00', '21:00', '22:00', '23:00'])
+    expect(getEveningTimeAxis([stage], 'Friday')).toEqual(['20:00', '21:00', '22:00', '23:00', '24:00'])
   })
 
   it('supports legacy string slotDuration values when deriving slot labels', () => {
     const stage = {
       ...makeSequentialStage('legacy-main', [{ startTime: '12:00', endTime: '15:00' }]),
-      slotDuration: '90' as unknown as number,
+      slotDuration: '90' as unknown as Stage['slotDuration'],
     }
     expect(getSlotLabels(stage, 'Friday', 0)).toEqual(['12:00', '13:30'])
   })
@@ -136,7 +129,7 @@ describe('getEveningTimeAxis – multi-event stages', () => {
     }
 
     const axis = getEveningTimeAxis([stage], 'Friday')
-    expect(axis).toEqual(['23:00', '00:00', '01:00'])
+    expect(axis).toEqual(['23:00', '00:00', '01:00', '02:00'])
     expect(getSimultaneousRowRange(stage, 'Friday', axis, 0)).toEqual({
       gridRowStart: 2,
       gridRowEnd: 5,

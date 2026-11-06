@@ -31,12 +31,11 @@ describe('getEveningTimeAxis – multi-event stage', () => {
     })
 
     const axis = getEveningTimeAxis([stage], 'Friday')
-    // First event: 14:00, 15:00 (2 slots). Second event: 20:00, 21:00 (2 slots).
-    // Combined axis spans 14:00–22:00 at 60-min intervals = 8 labels.
-    expect(axis).toEqual(['14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'])
+    // 60-minute GCF axis from 14:00 to 22:00 with explicit end boundary.
+    expect(axis).toEqual(['14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'])
   })
 
-  it('uses the minimum slotDuration across events when stages differ', () => {
+  it('uses the GCF of stage durations when stages differ', () => {
     const stage30 = makeStage({
       id: 'stage-30',
       slotDuration: 30,
@@ -53,8 +52,8 @@ describe('getEveningTimeAxis – multi-event stage', () => {
     })
 
     const axis = getEveningTimeAxis([stage30, stage60], 'Friday')
-    // Min duration = 30. 20:00–22:00 at 30-min steps = 4 labels.
-    expect(axis).toEqual(['20:00', '20:30', '21:00', '21:30'])
+    // GCF(30, 60) = 30, with event-end boundary included.
+    expect(axis).toEqual(['20:00', '20:30', '21:00', '21:30', '22:00'])
   })
 
   it('returns an empty array when no events have valid times', () => {
@@ -69,7 +68,7 @@ describe('getEveningTimeAxis – multi-event stage', () => {
       schedule: { Friday: [{ startTime: '20:00', endTime: '23:00' }] },
     })
     const axis = getEveningTimeAxis([stage], 'Friday')
-    expect(axis).toEqual(['20:00', '21:00', '22:00'])
+    expect(axis).toEqual(['20:00', '21:00', '22:00', '23:00'])
   })
 })
 

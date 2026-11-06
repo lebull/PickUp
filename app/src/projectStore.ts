@@ -2,9 +2,14 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/fi
 import { auth, db } from './firebase'
 import type { Project, SlotAssignment, Assignment, SlotCoord, DJSlotAssignment } from './types'
 import { isSlotAssignment, isBlankAssignment, isSimultaneousCoord } from './types'
+import { coerceSetLength } from './types'
 import { getSubmissionConverter } from './submissionConverters'
 
-function projectsCol() {
+function sharedProjectsCol() {
+  return collection(db, 'projects')
+}
+
+function legacyProjectsCol() {
   const uid = auth.currentUser?.uid
   if (!uid) throw new Error('Not signed in.')
   return collection(db, 'users', uid, 'projects')
@@ -33,7 +38,7 @@ export async function createProject(name: string, startDate?: string, endDate?: 
     createdAt: now,
     updatedAt: now,
   }
-  await setDoc(doc(projectsCol(), project.id), project)
+  await setDoc(doc(sharedProjectsCol(), project.id), project)
   return project
 }
 
@@ -52,10 +57,7 @@ export function normalizeProject(project: Project): Project {
     // Legacy stages without the field default to "sequential".
     stages: project.stages.map((s) => {
       const normalizedStageType = s.stageType ?? 'sequential'
-      const normalizedSlotDuration = (() => {
-        const raw = typeof s.slotDuration === 'number' ? s.slotDuration : Number(s.slotDuration)
-        return Number.isFinite(raw) && raw > 0 ? raw : 60
-      })()
+      const normalizedSlotDuration = coerceSetLength(s.slotDuration)
       // For special stages, don't require schedule or slotDuration
       if (normalizedStageType === 'special') {
         return {
@@ -111,25 +113,59 @@ export function normalizeProject(project: Project): Project {
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  const snap = await getDoc(doc(projectsCol(), id))
-  return snap.exists() ? normalizeProject(snap.data() as Project) : null
+  const sharedRef = doc(sharedProjectsCol(), id)
+  const sharedSnap = await getDoc(sharedRef)
+  if (sharedSnap.exists()) {
+    return normalizeProject(sharedSnap.data() as Project)
+  }
+
+  // Legacy fallback: load user-scoped project and promote it to shared storage.
+  const legacySnap = await getDoc(doc(legacyProjectsCol(), id))
+  if (!legacySnap.exists()) return null
+
+  const normalized = normalizeProject(legacySnap.data() as Project)
+  await setDoc(sharedRef, normalized)
+  return normalized
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const snap = await getDocs(projectsCol())
-  const all = snap.docs.map((d) => d.data() as Project)
-  return all
+  const sharedSnap = await getDocs(sharedProjectsCol())
+  const sharedProjects = sharedSnap.docs
+    .map((d) => d.data() as Project)
     .map(normalizeProject)
+
+  const sharedById = new Map(sharedProjects.map((p) => [p.id, p] as const))
+
+  // Legacy fallback: include/migrate the current user's historical projects.
+  const legacySnap = await getDocs(legacyProjectsCol())
+  const legacyProjects = legacySnap.docs
+    .map((d) => d.data() as Project)
+    .map(normalizeProject)
+
+  for (const project of legacyProjects) {
+    if (sharedById.has(project.id)) continue
+    sharedById.set(project.id, project)
+    await setDoc(doc(sharedProjectsCol(), project.id), project)
+  }
+
+  return Array.from(sharedById.values())
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 }
 
 export async function saveProject(project: Project): Promise<void> {
   const updated: Project = { ...project, updatedAt: new Date().toISOString() }
-  await setDoc(doc(projectsCol(), updated.id), updated)
+  await setDoc(doc(sharedProjectsCol(), updated.id), updated)
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await deleteDoc(doc(projectsCol(), id))
+  await deleteDoc(doc(sharedProjectsCol(), id))
+
+  // Best-effort legacy cleanup for projects that existed before shared storage.
+  try {
+    await deleteDoc(doc(legacyProjectsCol(), id))
+  } catch {
+    // Ignore legacy cleanup failures so shared delete remains authoritative.
+  }
 }
 
 export function exportProject(project: Project): void {

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, formatTimeLabel, timeToMinutes, getStageEventType, getProjectDayNames, getScheduleEventsForDay } from '../lineupUtils.ts'
+import { formatTimeLabel, timeToMinutes, getStageEventType, getProjectDayNames, getScheduleEventsForDay, getStageEventSlots } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
+import { SequentialSlotCell } from './SequentialSlotCell.tsx'
+import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
 
 interface Props {
   submissions: Submission[]
@@ -39,9 +41,11 @@ export function StageGrid({
 }: Props) {
   const { hiddenNames, timeFormat } = useAppPreferences()
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [gridPeek, setGridPeek] = useState<{ sub: Submission; rect: DOMRect; useMoonlight: boolean } | null>(null)
 
   const stage = stages.find((s) => s.id === activeStageId)
   const isSimultaneous = stage?.stageType === 'simultaneous'
+  const useMoonlight = stage?.useMoonlightScores ?? false
 
   function getTimedEvents(day: string) {
     return getScheduleEventsForDay(stage?.schedule, day).filter((event) => getStageEventType(event) !== 'special')
@@ -60,13 +64,13 @@ export function StageGrid({
     return projectDays.filter((d) => (stage.activeDays ?? []).includes(d))
   }, [projectEndDate, projectStartDate, stage])
 
-  // Unified time slot row axis across all active days (union, sorted chronologically)
+  // Unified sequential slot rows across all active days (union by real slot starts).
   const slotRows = useMemo(() => {
     if (!stage || isSimultaneous) return []
     const allLabels = new Set<string>()
     for (const day of activeDays) {
-      for (const label of getSlotLabels(stage, day, 0)) {
-        allLabels.add(label)
+      for (const slot of getStageEventSlots(stage, day)) {
+        allLabels.add(slot.timeLabel)
       }
     }
     return [...allLabels].sort((a, b) => {
@@ -80,12 +84,12 @@ export function StageGrid({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage?.id, activeDays, isSimultaneous])
 
-  function getAssignment(evening: string, slotIndex: number): SlotAssignment | undefined {
+  function getAssignment(evening: string, eventIndex: number, slotIndex: number): SlotAssignment | undefined {
     return assignments.find(
       (a) =>
         a.stageId === activeStageId &&
         a.evening === evening &&
-        (a.eventIndex ?? 0) === 0 &&
+        (a.eventIndex ?? 0) === eventIndex &&
         a.slotIndex === slotIndex
     )
   }
@@ -100,6 +104,53 @@ export function StageGrid({
           (a.eventIndex ?? 0) === eventIndex
       )
       .sort((a, b) => (a.positionIndex ?? 0) - (b.positionIndex ?? 0))
+  }
+
+  function handleDayHeaderClick(day: string) {
+    if (!stage) return
+
+    if (isSimultaneous) {
+      const dayEvents = getTimedEvents(day)
+      const eventCount = Math.max(dayEvents.length, 1)
+      const candidateEventIndices = Array.from({ length: eventCount }, (_, idx) => idx)
+      const targetEventIndex = candidateEventIndices.find((idx) => {
+        const usedPositions = new Set(
+          getSimultaneousAssignments(day, idx).map((a) => a.positionIndex as 1 | 2 | 3)
+        )
+        return ([1, 2, 3] as const).some((p) => !usedPositions.has(p))
+      }) ?? candidateEventIndices[0]
+
+      const usedPositions = new Set(
+        getSimultaneousAssignments(day, targetEventIndex).map((a) => a.positionIndex as 1 | 2 | 3)
+      )
+      const positionIndex = ([1, 2, 3] as const).find((p) => !usedPositions.has(p)) ?? 1
+      const dayEvent = dayEvents[targetEventIndex]
+      const eventTimeLabel = dayEvent?.startTime ? formatTimeLabel(dayEvent.startTime, timeFormat) : '—'
+
+      onSlotClick({
+        stageId: stage.id,
+        evening: day,
+        positionIndex,
+        timeLabel: eventTimeLabel,
+        eventIndex: targetEventIndex,
+      })
+      return
+    }
+
+    const daySlots = getStageEventSlots(stage, day)
+    if (daySlots.length === 0) return
+
+    const firstEmpty = daySlots.find(
+      ({ eventIndex, slotIndex }) => !getAssignment(day, eventIndex, slotIndex)
+    )
+    const target = firstEmpty ?? daySlots[0]
+    onSlotClick({
+      stageId: stage.id,
+      evening: day,
+      slotIndex: target.slotIndex,
+      eventIndex: target.eventIndex,
+      timeLabel: target.timeLabel,
+    })
   }
 
   if (!stage) {
@@ -139,8 +190,17 @@ export function StageGrid({
         {activeDays.map((day) => (
           <div
             key={`header-${day}`}
-            className="grid-cell grid-header grid-stage-header"
+            className="grid-cell grid-header grid-stage-header grid-stage-header--clickable"
             style={stageColor ? { borderBottom: `3px solid ${stageColor}` } : undefined}
+            role="button"
+            tabIndex={0}
+            onClick={() => handleDayHeaderClick(day)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                handleDayHeaderClick(day)
+              }
+            }}
           >
             {day}
           </div>
@@ -177,7 +237,11 @@ export function StageGrid({
                     className={`grid-cell grid-slot grid-slot--simultaneous${isActive ? ' grid-slot--active' : ''}${isSimDragOver ? ' grid-slot--drag-over' : ''}`}
                     onDragEnter={(e) => { e.preventDefault(); if (!isSimFull) setDragOverKey(simSlotKey) }}
                     onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null) }}
-                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = isSimFull ? 'none' : 'move' }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = isSimFull ? 'none' : 'move'
+                      if (!isSimFull && dragOverKey !== simSlotKey) setDragOverKey(simSlotKey)
+                    }}
                     onDrop={(e) => {
                       e.preventDefault()
                       setDragOverKey(null)
@@ -204,6 +268,10 @@ export function StageGrid({
                             style={stageColor ? { borderColor: stageColor, backgroundColor: hexToTint(stageColor, 0.1) } : undefined}
                             title={badgeUnavail ? `Available: ${subInfo!.daysAvailable}` : undefined}
                             draggable={!isBlankAssignment(a)}
+                            onMouseEnter={!isBlankAssignment(a) && subInfo && hasAnyScore(subInfo, useMoonlight) ? (e) => {
+                              setGridPeek({ sub: subInfo, rect: e.currentTarget.getBoundingClientRect(), useMoonlight })
+                            } : undefined}
+                            onMouseLeave={!isBlankAssignment(a) && subInfo && hasAnyScore(subInfo, useMoonlight) ? () => setGridPeek(null) : undefined}
                             onDragStart={!isBlankAssignment(a) ? (e) => {
                               e.stopPropagation()
                               e.dataTransfer.setData('application/dj-slot-key', JSON.stringify({ stageId: stage.id, evening: day, positionIndex: a.positionIndex, eventIndex: ei }))
@@ -220,7 +288,10 @@ export function StageGrid({
                             <button
                               type="button"
                               className="simultaneous-dj-remove"
-                              onClick={() => onRemoveSimultaneous(stage.id, day, a.positionIndex as 1 | 2 | 3, ei)}
+                              onClick={() => {
+                                setGridPeek(null)
+                                onRemoveSimultaneous(stage.id, day, a.positionIndex as 1 | 2 | 3, ei)
+                              }}
                             >
                               ✕
                             </button>
@@ -265,22 +336,22 @@ export function StageGrid({
                 {formatTimeLabel(label, timeFormat)}
               </div>
               {activeDays.map((day) => {
-                // Find the actual slot index for this day (may differ from the union row index)
-                const dayLabels = getSlotLabels(stage, day, 0)
-                const daySlotIdx = dayLabels.indexOf(label)
-                const slotKey = `${stage.id}|${day}|0|${daySlotIdx}`
-                const isActive = daySlotIdx !== -1 && activeSlotKey === slotKey
-
-                if (daySlotIdx === -1) {
+                // Find the actual event/slot for this day that matches this time label.
+                const matchedSlot = getStageEventSlots(stage, day).find((slot) => slot.timeLabel === label)
+                if (!matchedSlot) {
                   return (
                     <div
-                      key={`${day}-oor`}
+                      key={`${day}-oor-${label}`}
                       className="grid-cell grid-slot grid-slot--out-of-range"
                     />
                   )
                 }
 
-                const assignment = getAssignment(day, daySlotIdx)
+                const { eventIndex, slotIndex } = matchedSlot
+                const slotKey = `${stage.id}|${day}|${eventIndex}|${slotIndex}`
+                const isActive = activeSlotKey === slotKey
+
+                const assignment = getAssignment(day, eventIndex, slotIndex)
                 const isOccupied = !!assignment && !isBlankAssignment(assignment)
                 const isBlankSlot = !!assignment && isBlankAssignment(assignment)
                 const assignedLabel = assignment
@@ -295,82 +366,52 @@ export function StageGrid({
                 const isUnavailable = sub ? !sub.daysAvailable.toLowerCase().includes(day.toLowerCase()) : false
                 const submissionNum = isOccupied && assignment && !isBlankAssignment(assignment) ? assignment.submissionNumber : null
                 const isDragOver = dragOverKey === slotKey
+                const canPeek = !!sub && hasAnyScore(sub, useMoonlight)
 
-                return assignment ? (
-                  <button
-                    key={`${day}-${label}`}
-                    type="button"
-                    className={`grid-cell grid-slot ${isBlankSlot ? 'grid-slot--blank' : 'grid-slot--occupied'}${isActive ? ' grid-slot--active' : ''}${isDragOver ? ' grid-slot--drag-over' : ''}${isUnavailable ? ' grid-slot--availability-error' : ''}`}
+                return (
+                  <SequentialSlotCell
+                    key={slotKey}
+                    slotKey={slotKey}
+                    stageId={stage.id}
+                    evening={day}
+                    eventIndex={eventIndex}
+                    slotIndex={slotIndex}
+                    assignedLabel={assignedLabel}
+                    isBlank={isBlankSlot}
+                    isActive={isActive}
+                    isDragOver={isDragOver}
+                    isUnavailable={isUnavailable}
+                    unavailableTitle={sub ? `Available: ${sub.daysAvailable}` : undefined}
+                    genre={genre}
+                    submissionNumber={submissionNum}
                     style={isOccupied && stageColor ? { backgroundColor: hexToTint(stageColor, 0.25) } : undefined}
-                    title={isUnavailable ? `Available: ${sub!.daysAvailable}` : undefined}
-                    draggable={isOccupied}
-                    onDragStart={isOccupied && submissionNum ? (e) => {
-                      e.dataTransfer.setData('application/dj-slot-key', JSON.stringify({ stageId: stage.id, evening: day, slotIndex: daySlotIdx, eventIndex: 0 }))
-                      e.dataTransfer.setData('application/dj-submission-number', submissionNum)
-                      e.dataTransfer.effectAllowed = 'move'
-                    } : undefined}
-                    onDragEnter={(e) => { e.preventDefault(); setDragOverKey(slotKey) }}
-                    onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null) }}
-                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      setDragOverKey(null)
-                      const slotKeyData = e.dataTransfer.getData('application/dj-slot-key')
-                      if (slotKeyData) {
-                        onMoveAssignment(JSON.parse(slotKeyData) as SlotCoord, { stageId: stage.id, evening: day, slotIndex: daySlotIdx, eventIndex: 0 })
-                      } else {
-                        const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                        if (subNum) onAssign(stage.id, day, daySlotIdx, subNum, 0)
-                      }
-                    }}
-                    onClick={() =>
-                      onSlotClick({ stageId: stage.id, evening: day, slotIndex: daySlotIdx, timeLabel: label, eventIndex: 0 })
-                    }
-                  >
-                    {assignedLabel}
-                    {isOccupied && genre && <span className="slot-genre">{genre}</span>}
-                    {isOccupied && (
-                      <button
-                        type="button"
-                        className="slot-remove-btn"
-                        title="Remove DJ"
-                        onClick={(e) => { e.stopPropagation(); onRemove(stage.id, day, daySlotIdx, 0) }}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    key={`${day}-${label}`}
-                    type="button"
-                    className={`grid-cell grid-slot grid-slot--empty${isActive ? ' grid-slot--active' : ''}${isDragOver ? ' grid-slot--drag-over' : ''}`}
-                    onClick={() =>
-                      onSlotClick({ stageId: stage.id, evening: day, slotIndex: daySlotIdx, timeLabel: label, eventIndex: 0 })
-                    }
-                    onDragEnter={(e) => { e.preventDefault(); setDragOverKey(slotKey) }}
-                    onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverKey(null) }}
-                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      setDragOverKey(null)
-                      const slotKeyData = e.dataTransfer.getData('application/dj-slot-key')
-                      if (slotKeyData) {
-                        onMoveAssignment(JSON.parse(slotKeyData) as SlotCoord, { stageId: stage.id, evening: day, slotIndex: daySlotIdx, eventIndex: 0 })
-                      } else {
-                        const subNum = e.dataTransfer.getData('application/dj-submission-number')
-                        if (subNum) onAssign(stage.id, day, daySlotIdx, subNum, 0)
-                      }
-                    }}
-                  >
-                    +
-                  </button>
+                    onSetDragOver={setDragOverKey}
+                    onMoveAssignment={onMoveAssignment}
+                    onAssignSubmission={(subNum) => onAssign(stage.id, day, slotIndex, subNum, eventIndex)}
+                    onSlotClick={() => onSlotClick({ stageId: stage.id, evening: day, slotIndex, timeLabel: label, eventIndex })}
+                    onRemove={isOccupied ? () => onRemove(stage.id, day, slotIndex, eventIndex) : undefined}
+                    onPeekEnter={canPeek && sub ? (rect) => setGridPeek({ sub, rect, useMoonlight }) : undefined}
+                    onPeekLeave={canPeek ? () => setGridPeek(null) : undefined}
+                  />
                 )
               })}
             </>
           ))
         )}
       </div>
+
+      {gridPeek && (
+        <div
+          className="score-peek-tooltip"
+          style={{
+            position: 'fixed',
+            bottom: `${window.innerHeight - gridPeek.rect.top + 6}px`,
+            right: `${window.innerWidth - gridPeek.rect.right}px`,
+          }}
+        >
+          {buildPeekContent(gridPeek.sub, gridPeek.useMoonlight)}
+        </div>
+      )}
     </div>
   )
 }

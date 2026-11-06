@@ -1,3 +1,4 @@
+import { coerceSetLength } from './types.ts'
 import type { Stage } from './types.ts'
 import type { TimeFormat } from './AppPreferencesContext.ts'
 
@@ -91,6 +92,17 @@ function normalizeEventRange(startMinutes: number, endMinutes: number): { startM
   return { startMinutes, endMinutes: nextEnd }
 }
 
+function gcd(a: number, b: number): number {
+  let x = Math.abs(a)
+  let y = Math.abs(b)
+  while (y !== 0) {
+    const t = y
+    y = x % y
+    x = t
+  }
+  return x || 1
+}
+
 /**
  * Returns an array of "HH:MM" slot start-time labels for a specific event on a stage on a given evening.
  * Handles events that cross midnight (endTime < startTime).
@@ -104,10 +116,8 @@ export function getSlotLabels(stage: Stage, evening: string, eventIndex = 0): st
   if (!events || events.length === 0) return []
   const daySchedule = events[eventIndex]
   if (!daySchedule || getStageEventType(daySchedule) === 'special') return []
-  const slotDuration = typeof stage.slotDuration === 'number'
-    ? stage.slotDuration
-    : Number(stage.slotDuration)
-  if (!daySchedule.startTime || !daySchedule.endTime || !Number.isFinite(slotDuration) || slotDuration <= 0) return []
+  const slotDuration = coerceSetLength(stage.slotDuration)
+  if (!daySchedule.startTime || !daySchedule.endTime) return []
 
   const startMinutes = timeToMinutes(daySchedule.startTime)
   const { endMinutes } = normalizeEventRange(startMinutes, timeToMinutes(daySchedule.endTime))
@@ -129,68 +139,70 @@ export function getEventLabel(event: { label?: string }, index: number): string 
 
 /**
  * Returns the unified, chronologically sorted time axis for an evening.
- * Spans from the earliest start time to the latest end time across all active
- * sequential stages on that evening, stepping by the minimum slotDuration.
- * This produces a continuous axis — stages with no slot at a given time will
- * render empty cells (gap rows) rather than the axis collapsing.
- * Simultaneous stages contribute no rows to the axis.
+ * Uses the greatest common factor (GCF) of sequential slot durations as the
+ * base timeline step, spanning earliest event start to latest event end.
+ * Explicit slot starts and event boundaries are always included in the axis.
+ * This keeps row alignment stable across mixed stage durations while allowing
+ * slot cells to span vertically where no real schedule gap exists.
  * Times before 06:00 are treated as "next day" for sort order.
  */
 export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
   const activeStages = stages.filter((s) => (s.activeDays ?? []).includes(evening))
   if (activeStages.length === 0) return []
 
+  const sequentialSlotLabels = new Set<string>()
+  const explicitBoundaryLabels = new Set<string>()
+  const slotDurations: number[] = []
   let earliestStart = Infinity
   let latestEnd = -Infinity
-  let minDuration = Infinity
 
   for (const stage of activeStages) {
     const events = getScheduleEventsForDay(stage.schedule, evening)
-    if (!events || events.length === 0) continue
+
+    if (stage.stageType === 'sequential') {
+      slotDurations.push(coerceSetLength(stage.slotDuration))
+    }
 
     for (const event of events) {
       if (getStageEventType(event) === 'special') continue
       if (!event.startTime || !event.endTime) continue
 
+      explicitBoundaryLabels.add(event.startTime)
+      explicitBoundaryLabels.add(event.endTime)
+
       const startM = timeToMinutes(event.startTime)
       const { endMinutes: endM } = normalizeEventRange(startM, timeToMinutes(event.endTime))
-
       const startSortable = toSortableMinutes(startM)
       const endSortable = startSortable + (endM - startM)
 
       if (startSortable < earliestStart) earliestStart = startSortable
       if (endSortable > latestEnd) latestEnd = endSortable
-      const stageSlotDuration = typeof stage.slotDuration === 'number'
-        ? stage.slotDuration
-        : Number(stage.slotDuration)
-      if (stage.stageType !== 'simultaneous' && Number.isFinite(stageSlotDuration) && stageSlotDuration > 0 && stageSlotDuration < minDuration) {
-        minDuration = stageSlotDuration
+    }
+
+    for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
+      for (const slotLabel of getSlotLabels(stage, evening, eventIndex)) {
+        sequentialSlotLabels.add(slotLabel)
       }
     }
   }
 
   if (!isFinite(earliestStart) || !isFinite(latestEnd)) return []
-  if (!isFinite(minDuration)) minDuration = 60
 
-  const labels: string[] = []
-  for (let t = earliestStart; t < latestEnd; t += minDuration) {
-    // Convert back from sortable minutes to actual HH:MM
+  let axisStep = 60
+  if (slotDurations.length > 0) {
+    axisStep = slotDurations.reduce((acc, value) => gcd(acc, value), slotDurations[0])
+  }
+  if (!Number.isFinite(axisStep) || axisStep <= 0) axisStep = 60
+
+  const generatedLabels = new Set<string>()
+  for (let t = earliestStart; t < latestEnd; t += axisStep) {
     const actualMinutes = t >= 24 * 60 ? t - 24 * 60 : t
-    labels.push(minutesToTime(actualMinutes))
+    generatedLabels.add(minutesToTime(actualMinutes))
   }
 
-  // Include all real sequential slot starts so stages with offset starts
-  // (e.g. 12:15 with 90-minute slots) are always represented on the axis.
-  const allLabels = new Set(labels)
-  for (const stage of activeStages) {
-    if (stage.stageType === 'simultaneous') continue
-    const events = getScheduleEventsForDay(stage.schedule, evening)
-    for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
-      for (const slotLabel of getSlotLabels(stage, evening, eventIndex)) {
-        allLabels.add(slotLabel)
-      }
-    }
-  }
+  const allLabels = new Set<string>(generatedLabels)
+  for (const label of explicitBoundaryLabels) allLabels.add(label)
+  for (const label of sequentialSlotLabels) allLabels.add(label)
 
   return [...allLabels].sort((a, b) => toSortableMinutes(timeToMinutes(a)) - toSortableMinutes(timeToMinutes(b)))
 }

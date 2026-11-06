@@ -14,6 +14,7 @@ import { AppPreferencesContext, useAppPreferencesState } from './AppPreferencesC
 import { NavActionsMenu } from './components/NavActionsMenu.tsx'
 import { AuthGate } from './components/AuthGate.tsx'
 import { CsvImport } from './components/CsvImport.tsx'
+import { UserManagement } from './components/UserManagement.tsx'
 
 // ── Project Workspace ────────────────────────────────────────────────────────
 
@@ -220,6 +221,7 @@ function App() {
       <Routes>
         <Route path="/" element={<ProjectList />} />
         <Route path="/new" element={<ProjectCreate />} />
+        <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/project/:id" element={<ProjectWorkspace />}>
           <Route index element={<Navigate replace to="submissions" />} />
           <Route path="submissions" element={<SubmissionsView />} />

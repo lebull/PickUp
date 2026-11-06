@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import type { Stage, StageSchedule, SlotAssignment } from '../types.ts'
+import { SET_LENGTH_OPTIONS, type SetLength, type Stage, type StageSchedule, type SlotAssignment } from '../types.ts'
 import { getProjectDayNames, getSlotLabels, getEventLabel, eventsOverlap, getStageEventType } from '../lineupUtils.ts'
 import { STAGE_COLOR_PALETTE } from '../stageColors.ts'
 
@@ -267,16 +267,17 @@ export function StageConfigPanel({ stages, assignments, projectStartDate, projec
                       {(stage.stageType ?? 'sequential') === 'sequential' && (
                         <div className="stage-setting">
                           <span className="stage-field-label">Slot (min)</span>
-                          <input
-                            type="number"
+                          <select
                             className="slot-duration-input"
                             value={stage.slotDuration ?? 60}
-                            min={15}
-                            step={15}
                             onChange={(e) =>
-                              updateStage(stage.id, { slotDuration: Number(e.target.value) })
+                              updateStage(stage.id, { slotDuration: Number(e.target.value) as SetLength })
                             }
-                          />
+                          >
+                            {SET_LENGTH_OPTIONS.map((minutes) => (
+                              <option key={minutes} value={minutes}>{minutes}</option>
+                            ))}
+                          </select>
                         </div>
                       )}
                       <label className="stage-moonlight-toggle">

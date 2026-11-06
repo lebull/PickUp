@@ -1,5 +1,14 @@
 import type { MainScore, MLScore } from './scoreCalculation.ts'
 
+export const SET_LENGTH_OPTIONS = [20, 30, 45, 60, 90, 120] as const
+export type SetLength = (typeof SET_LENGTH_OPTIONS)[number]
+
+export function coerceSetLength(value: unknown, fallback: SetLength = 60): SetLength {
+  const raw = typeof value === 'number' ? value : Number(value)
+  if (SET_LENGTH_OPTIONS.includes(raw as SetLength)) return raw as SetLength
+  return fallback
+}
+
 export interface StageSchedule {
   /** Defaults to 'timed' when omitted. Special events are unscheduled pick lists. */
   eventType?: 'timed' | 'special'
@@ -19,7 +28,7 @@ export interface Stage {
   /** Per-day event schedule. Key is the day name (e.g. "Friday"). Each day holds one or more timed event blocks. Only used for sequential/simultaneous stages. */
   schedule?: Record<string, StageSchedule[]>
   /** Slot duration in minutes. Required for sequential stages; omitted for simultaneous/special stages. */
-  slotDuration?: number
+  slotDuration?: SetLength
   /** Optional display color as a hex string (e.g. "#6366f1"). Chosen from the curated stage color palette. */
   color?: string
   /** When true, this stage uses ML scores for sorting and Moonlight-interest filtering in the DJ selection panel. */

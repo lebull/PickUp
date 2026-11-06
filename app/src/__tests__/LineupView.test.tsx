@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { useState } from 'react'
@@ -157,6 +157,72 @@ describe('LineupView special events mode', () => {
     expect(screen.getAllByText('Empty — drag a DJ here').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Assign DJ Alpha' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Assign DJ Beta' })).toBeNull()
+  })
+
+  it('clicking a stage-view day header opens slot context with availability filtering', async () => {
+    const user = userEvent.setup()
+    renderLineup({
+      submissions: [
+        makeSubmission('S001', 'DJ Alpha', { daysAvailable: 'Wednesday, Friday' }),
+        makeSubmission('S002', 'DJ Beta', { daysAvailable: 'Thursday' }),
+      ],
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Stage View' }))
+    await user.click(screen.getByRole('button', { name: 'Friday' }))
+
+    expect(screen.getAllByText('Empty — drag a DJ here').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Assign DJ Alpha' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Assign DJ Beta' })).toBeNull()
+  })
+
+  it('shows score peek tooltip in Stage view on hover of an assigned DJ', async () => {
+    const user = userEvent.setup()
+    renderLineup({
+      submissions: [
+        makeSubmission('S001', 'DJ Alpha', {
+          mainScore: { avg: 8.0, sum: 24, partial: false },
+          j1Technical: 8,
+          j1Flow: 8,
+          j1Entertainment: 8,
+        }),
+        makeSubmission('S002', 'DJ Beta'),
+      ],
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Main Stage' }))
+    await user.click(screen.getByRole('button', { name: 'Assign DJ Alpha' }))
+    await user.click(screen.getByRole('button', { name: 'Stage View' }))
+
+    await user.hover(screen.getAllByText('DJ Alpha')[0])
+    expect(screen.getByText('Avg')).toBeTruthy()
+  })
+
+  it('closes score peek tooltip when removing a DJ from a slot', async () => {
+    const user = userEvent.setup()
+    renderLineup({
+      submissions: [
+        makeSubmission('S001', 'DJ Alpha', {
+          mainScore: { avg: 8.0, sum: 24, partial: false },
+          j1Technical: 8,
+          j1Flow: 8,
+          j1Entertainment: 8,
+        }),
+      ],
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Main Stage' }))
+    await user.click(screen.getByRole('button', { name: 'Assign DJ Alpha' }))
+    await user.click(screen.getByRole('button', { name: 'Stage View' }))
+
+    await user.hover(screen.getAllByText('DJ Alpha')[0])
+    expect(screen.getByText('Avg')).toBeTruthy()
+
+    await user.click(screen.getAllByTitle('Remove DJ')[0])
+
+    await waitFor(() => {
+      expect(screen.queryByText('Avg')).toBeNull()
+    })
   })
 
   it('lets user assign a DJ from Special Events mode', async () => {

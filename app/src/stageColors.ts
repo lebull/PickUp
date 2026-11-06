@@ -37,3 +37,15 @@ export function hexToTint(hex: string, alpha = 0.2): string {
   if (isNaN(r) || isNaN(g) || isNaN(b)) return 'transparent'
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
+
+/** Returns a high-contrast text color for a given hex background color. */
+export function getReadableTextColor(hex: string): '#0f172a' | '#f8fafc' {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '#f8fafc'
+
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.6 ? '#0f172a' : '#f8fafc'
+}
