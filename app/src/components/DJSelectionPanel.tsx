@@ -24,6 +24,7 @@ interface Props {
   stages: Stage[]
   assignments: SlotAssignment[]
   discardedSubmissionNumbers: Set<string>
+  projectSupportsMoonlight?: boolean
   /** Optional additional exclusions (e.g. DJs who previously declined a slot). Combined with discardedSubmissionNumbers. */
   excludedSubmissionNumbers?: Set<string>
   activeSlot: ActiveSlot | null
@@ -260,6 +261,7 @@ export function DJSelectionPanel({
   stages,
   assignments,
   discardedSubmissionNumbers,
+  projectSupportsMoonlight = true,
   excludedSubmissionNumbers,
   activeSlot,
   currentEvening,
@@ -283,7 +285,7 @@ export function DJSelectionPanel({
   const activeEvent = activeSlot ? stage?.schedule?.[activeSlot.evening]?.[activeSlot.eventIndex ?? 0] : undefined
   const isSpecialStage = stage?.stageType === 'special'
   const isSpecialEvent = isSpecialStage || (activeEvent ? getStageEventType(activeEvent) === 'special' : false)
-  const useMoonlight = !isBrowsing && (stage?.useMoonlightScores ?? false)
+  const useMoonlight = projectSupportsMoonlight && !isBrowsing && (stage?.useMoonlightScores ?? false)
   const effectiveEvening = activeSlot?.evening ?? currentEvening
 
   // Derive grouping options from the actual preference values in submissions,
@@ -449,7 +451,9 @@ export function DJSelectionPanel({
         {isBrowsing ? (
           <>
             <span className="dj-col-score" title={fmt(mainScoreVal)}>{fmt(mainScoreVal)}</span>
-            <span className="dj-col-score dj-col-score--ml" title={fmt(mlScoreVal)}>{fmt(mlScoreVal)}</span>
+            {projectSupportsMoonlight && (
+              <span className="dj-col-score dj-col-score--ml" title={fmt(mlScoreVal)}>{fmt(mlScoreVal)}</span>
+            )}
           </>
         ) : (
           <span
@@ -464,7 +468,7 @@ export function DJSelectionPanel({
         )}
         <span className="dj-col-genre" title={(useMoonlight ? s.mlGenre : s.genre) || '—'}>{(useMoonlight ? s.mlGenre : s.genre) || '—'}</span>
         <span className="dj-col-format" title={s.formatGear || '—'}>{s.formatGear || '—'}</span>
-        {(useMoonlight || isBrowsing) && (
+        {(useMoonlight || (isBrowsing && projectSupportsMoonlight)) && (
           <span className="dj-col-vibefit" title={s.mlVibefit || '—'}>{s.mlVibefit || '—'}</span>
         )}
         <span className="dj-col-stages" title={s.stagePreferences.filter(Boolean).join(', ') || '—'}>
@@ -591,14 +595,14 @@ export function DJSelectionPanel({
         {isBrowsing ? (
           <>
             <span className="dj-col-score">Score</span>
-            <span className="dj-col-score dj-col-score--ml">ML</span>
+            {projectSupportsMoonlight && <span className="dj-col-score dj-col-score--ml">ML</span>}
           </>
         ) : (
           <span className="dj-col-score">{useMoonlight ? 'ML' : 'Score'}</span>
         )}
         <span className="dj-col-genre">Genre</span>
         <span className="dj-col-format">Format / Gear</span>
-        {(useMoonlight || isBrowsing) && <span className="dj-col-vibefit">Vibefit</span>}
+        {(useMoonlight || (isBrowsing && projectSupportsMoonlight)) && <span className="dj-col-vibefit">Vibefit</span>}
         <span className="dj-col-stages">Stage Prefs</span>
       </div>
       </div>

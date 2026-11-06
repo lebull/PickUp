@@ -109,7 +109,12 @@ export interface LineupState {
 export interface Project {
   id: string
   name: string
+  /** Whether this project uses moonlight-specific scoring/features. */
+  supportsMoonlight?: boolean
+  startDate: string // YYYY-MM-DD
+  endDate: string   // YYYY-MM-DD
   csvText: string
+  submissionConverterId?: string
   stages: Stage[]
   assignments: Assignment[]
   discardedSubmissions: string[]

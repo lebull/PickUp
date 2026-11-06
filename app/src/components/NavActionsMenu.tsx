@@ -1,19 +1,100 @@
 import { useRef, useState, useEffect } from 'react'
-import type { Project } from '../types.ts'
-import { exportProject } from '../projectStore.ts'
+import { useNavigate } from 'react-router-dom'
+import type { Project, StageSchedule } from '../types.ts'
+import { deleteProject, exportProject } from '../projectStore.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { CsvImport } from './CsvImport.tsx'
+import { getProjectDayNames } from '../lineupUtils.ts'
+import { getSubmissionConverter } from '../submissionConverters.ts'
 import type { Submission } from '../types.ts'
 
 interface Props {
   project: Project
-  onImport: (subs: Submission[], fileName: string, csvText: string) => void
+  onImport: (subs: Submission[], fileName: string, csvText: string, converterId: string) => void
+  onProjectChange?: (project: Project) => void
 }
 
-export function NavActionsMenu({ project, onImport }: Props) {
+export function NavActionsMenu({ project, onImport, onProjectChange }: Props) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [startDate, setStartDate] = useState(project.startDate ?? '')
+  const [endDate, setEndDate] = useState(project.endDate ?? '')
+  const [supportsMoonlight, setSupportsMoonlight] = useState(
+    project.supportsMoonlight ?? getSubmissionConverter(project.submissionConverterId).supportsMoonlight
+  )
+  const [dateError, setDateError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const { hiddenNames, setHiddenNames, timeFormat, setTimeFormat } = useAppPreferences()
+
+  useEffect(() => {
+    setStartDate(project.startDate ?? '')
+    setEndDate(project.endDate ?? '')
+    setSupportsMoonlight(project.supportsMoonlight ?? getSubmissionConverter(project.submissionConverterId).supportsMoonlight)
+    setDateError(null)
+  }, [project.startDate, project.endDate, project.supportsMoonlight, project.submissionConverterId])
+
+  async function handleDeleteProject() {
+    if (isDeleting) return
+    const confirmed = window.confirm(`Delete project "${project.name}"? This cannot be undone.`)
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    try {
+      await deleteProject(project.id)
+      navigate('/')
+    } finally {
+      setIsDeleting(false)
+      setOpen(false)
+    }
+  }
+
+  function handleSaveDates() {
+    if (!startDate || !endDate) {
+      setDateError('Project start and end dates are required.')
+      return
+    }
+    if (startDate > endDate) {
+      setDateError('Project start date must be before the end date.')
+      return
+    }
+    if (!onProjectChange) return
+
+    const projectDays = getProjectDayNames(startDate, endDate)
+
+    const nextStages = project.stages.map((stage) => {
+      const resolvedActiveDays = projectDays.length > 0
+        ? ((stage.activeDays ?? []).filter((day) => projectDays.includes(day)).length > 0 ? (stage.activeDays ?? []).filter((day) => projectDays.includes(day)) : projectDays)
+        : (stage.activeDays ?? [])
+
+      const scheduleEntries: Record<string, StageSchedule[]> = {}
+      for (const day of projectDays) {
+        const existing = stage.schedule?.[day] ?? []
+        scheduleEntries[day] = existing.length > 0 ? existing : [{ eventType: 'timed', startTime: '', endTime: '' }]
+      }
+
+      const preservedEntries: Record<string, StageSchedule[]> = {}
+      for (const day of Object.keys(stage.schedule ?? {})) {
+        if (!projectDays.includes(day)) continue
+        preservedEntries[day] = stage.schedule?.[day] ?? []
+      }
+
+      return {
+        ...stage,
+        activeDays: resolvedActiveDays,
+        schedule: { ...scheduleEntries, ...preservedEntries },
+      }
+    })
+
+    onProjectChange({
+      ...project,
+      startDate,
+      endDate,
+      supportsMoonlight,
+      stages: nextStages,
+    })
+    setOpen(false)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -79,9 +160,58 @@ export function NavActionsMenu({ project, onImport }: Props) {
               {hiddenNames ? '🙈 Hidden' : '👁 Visible'}
             </button>
           </div>
-          <div className="nav-actions-divider" />
+          <div className="nav-actions-row nav-actions-row--stacked">
+            <span className="nav-actions-label">Project Dates</span>
+            <div className="project-date-fields">
+              <input
+                type="date"
+                className="form-input"
+                required
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value)
+                  setDateError(null)
+                }}
+              />
+              <span className="project-date-divider">to</span>
+              <input
+                type="date"
+                className="form-input"
+                required
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value)
+                  setDateError(null)
+                }}
+              />
+            </div>
+            {dateError && <span className="form-error">{dateError}</span>}
+            <button type="button" className="btn-secondary btn-small" onClick={handleSaveDates}>
+              Save Dates
+            </button>
+          </div>
           <div className="nav-actions-row">
-            <CsvImport onImport={(subs, name, csv) => { onImport(subs, name, csv); setOpen(false) }} />
+            <span className="nav-actions-label">Moonlight</span>
+            <div className="context-toggle" role="group" aria-label="Moonlight support">
+              <button
+                type="button"
+                className={`context-btn${!supportsMoonlight ? ' active' : ''}`}
+                onClick={() => setSupportsMoonlight(false)}
+              >
+                Off
+              </button>
+              <button
+                type="button"
+                className={`context-btn${supportsMoonlight ? ' active' : ''}`}
+                onClick={() => setSupportsMoonlight(true)}
+              >
+                On
+              </button>
+            </div>
+          </div>
+          <div className="nav-actions-divider" />
+          <div className="nav-actions-row nav-actions-row--import-export">
+            <CsvImport onImport={(subs, name, csv, converterId) => { onImport(subs, name, csv, converterId); setOpen(false) }} />
             <button
               type="button"
               className="btn-secondary btn-small"
@@ -90,6 +220,15 @@ export function NavActionsMenu({ project, onImport }: Props) {
               Export
             </button>
           </div>
+          <div className="nav-actions-divider" />
+          <button
+            type="button"
+            className="btn-danger btn-small nav-actions-delete-btn"
+            disabled={isDeleting}
+            onClick={handleDeleteProject}
+          >
+            {isDeleting ? 'Deleting…' : 'Delete Project'}
+          </button>
         </div>
       )}
     </div>

@@ -54,6 +54,7 @@ interface Props {
   cursorIndex: number | null
   lineupSubmissionNumbers: Set<string>
   discardedSubmissionNumbers: Set<string>
+  showMoonlightColumns?: boolean
   hiddenNames: boolean
   listRef: RefObject<HTMLDivElement | null>
   onHeaderClick: (field: SortField) => void
@@ -76,6 +77,7 @@ export function SubmissionList({
   cursorIndex,
   lineupSubmissionNumbers,
   discardedSubmissionNumbers,
+  showMoonlightColumns = true,
   hiddenNames,
   listRef,
   onHeaderClick,
@@ -245,16 +247,18 @@ export function SubmissionList({
               >
                 Main Score {arrow('main')}
               </th>
-              <th
-                className={`th-sortable${sortField === 'ml' ? ' th-active' : ''}`}
-                onClick={() => onHeaderClick('ml')}
-              >
-                ML Score {arrow('ml')}
-              </th>
+              {showMoonlightColumns && (
+                <th
+                  className={`th-sortable${sortField === 'ml' ? ' th-active' : ''}`}
+                  onClick={() => onHeaderClick('ml')}
+                >
+                  ML Score {arrow('ml')}
+                </th>
+              )}
               <th>Genre</th>
               <th>Preferred Stages</th>
               <th>Days Available</th>
-              <th>Vibefit</th>
+              {showMoonlightColumns && <th>Vibefit</th>}
             </tr>
           </thead>
           <tbody>
@@ -314,11 +318,11 @@ export function SubmissionList({
                     {displayScore(s, 'main', scoreMetric)}
                     {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored">*</span>}
                   </td>
-                  <td>{displayScore(s, 'ml', scoreMetric)}</td>
+                  {showMoonlightColumns && <td>{displayScore(s, 'ml', scoreMetric)}</td>}
                   <td>{s.genre || '—'}</td>
                   <td>{s.stagePreferences.join(', ') || '—'}</td>
                   <td>{s.daysAvailable || '—'}</td>
-                  <td>{s.mlVibefit || '—'}</td>
+                  {showMoonlightColumns && <td>{s.mlVibefit || '—'}</td>}
                 </tr>
               )
             })}

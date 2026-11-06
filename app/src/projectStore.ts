@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/fi
 import { auth, db } from './firebase'
 import type { Project, SlotAssignment, Assignment, SlotCoord, DJSlotAssignment } from './types'
 import { isSlotAssignment, isBlankAssignment, isSimultaneousCoord } from './types'
+import { getSubmissionConverter } from './submissionConverters'
 
 function projectsCol() {
   const uid = auth.currentUser?.uid
@@ -9,11 +10,21 @@ function projectsCol() {
   return collection(db, 'users', uid, 'projects')
 }
 
-export async function createProject(name: string): Promise<Project> {
+export async function createProject(name: string, startDate?: string, endDate?: string): Promise<Project> {
+  if (!startDate || !endDate) {
+    throw new Error('Project start and end dates are required.')
+  }
+  if (startDate > endDate) {
+    throw new Error('Project start date must be before the end date.')
+  }
+
   const now = new Date().toISOString()
   const project: Project = {
     id: crypto.randomUUID(),
     name,
+    supportsMoonlight: false,
+    startDate,
+    endDate,
     csvText: '',
     stages: [],
     assignments: [],
@@ -31,12 +42,20 @@ export async function createProject(name: string): Promise<Project> {
  * versions are present. This provides backward compatibility without a DB migration.
  */
 export function normalizeProject(project: Project): Project {
+  const inferredMoonlightSupport = getSubmissionConverter(project.submissionConverterId).supportsMoonlight
   return {
     ...project,
+    supportsMoonlight: project.supportsMoonlight ?? inferredMoonlightSupport,
+    startDate: project.startDate ?? '',
+    endDate: project.endDate ?? '',
     // stageType was added in the silent-disco-event-type change.
     // Legacy stages without the field default to "sequential".
     stages: project.stages.map((s) => {
       const normalizedStageType = s.stageType ?? 'sequential'
+      const normalizedSlotDuration = (() => {
+        const raw = typeof s.slotDuration === 'number' ? s.slotDuration : Number(s.slotDuration)
+        return Number.isFinite(raw) && raw > 0 ? raw : 60
+      })()
       // For special stages, don't require schedule or slotDuration
       if (normalizedStageType === 'special') {
         return {
@@ -61,7 +80,7 @@ export function normalizeProject(project: Project): Project {
             return [day, normalizedEvents]
           })
         ),
-        slotDuration: s.slotDuration ?? 60,
+        slotDuration: normalizedSlotDuration,
       }
     }),
     // discardedSubmissions was added in the discard-submission change.
@@ -138,6 +157,8 @@ export async function importProjectFromFile(file: File): Promise<Project> {
     typeof parsed !== 'object' ||
     parsed === null ||
     typeof (parsed as Record<string, unknown>).name !== 'string' ||
+    typeof (parsed as Record<string, unknown>).startDate !== 'string' ||
+    typeof (parsed as Record<string, unknown>).endDate !== 'string' ||
     !Array.isArray((parsed as Record<string, unknown>).stages) ||
     !Array.isArray((parsed as Record<string, unknown>).assignments)
   ) {

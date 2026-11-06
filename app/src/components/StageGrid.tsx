@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, formatTimeLabel, timeToMinutes, getStageEventType } from '../lineupUtils.ts'
+import { getSlotLabels, formatTimeLabel, timeToMinutes, getStageEventType, getProjectDayNames, getScheduleEventsForDay } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
-
-const CONVENTION_ORDER = ['Thursday', 'Friday', 'Saturday', 'Sunday']
 
 interface Props {
   submissions: Submission[]
   stages: Stage[]
   assignments: SlotAssignment[]
+  projectStartDate?: string
+  projectEndDate?: string
   activeStageId: string | null
   onSlotClick: (slot: ActiveSlot) => void
   onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex: number) => void
@@ -26,6 +26,8 @@ export function StageGrid({
   submissions,
   stages,
   assignments,
+  projectStartDate,
+  projectEndDate,
   activeStageId,
   onSlotClick,
   onAssign,
@@ -42,7 +44,7 @@ export function StageGrid({
   const isSimultaneous = stage?.stageType === 'simultaneous'
 
   function getTimedEvents(day: string) {
-    return (stage?.schedule?.[day] ?? []).filter((event) => getStageEventType(event) !== 'special')
+    return getScheduleEventsForDay(stage?.schedule, day).filter((event) => getStageEventType(event) !== 'special')
   }
 
   function getDisplayName(submissionNumber: string): string {
@@ -54,9 +56,9 @@ export function StageGrid({
   // Active days for this stage in convention order
   const activeDays = useMemo(() => {
     if (!stage) return []
-    return CONVENTION_ORDER.filter((d) => (stage.activeDays ?? []).includes(d))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage?.id, stage?.activeDays])
+    const projectDays = getProjectDayNames(projectStartDate, projectEndDate)
+    return projectDays.filter((d) => (stage.activeDays ?? []).includes(d))
+  }, [projectEndDate, projectStartDate, stage])
 
   // Unified time slot row axis across all active days (union, sorted chronologically)
   const slotRows = useMemo(() => {

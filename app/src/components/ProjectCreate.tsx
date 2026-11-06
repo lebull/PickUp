@@ -5,6 +5,8 @@ import { createProject } from '../projectStore'
 export function ProjectCreate() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -14,7 +16,15 @@ export function ProjectCreate() {
       setError('Project name is required.')
       return
     }
-    const project = await createProject(trimmed)
+    if (!startDate || !endDate) {
+      setError('Project start and end dates are required.')
+      return
+    }
+    if (startDate > endDate) {
+      setError('Project start date must be before the end date.')
+      return
+    }
+    const project = await createProject(trimmed, startDate, endDate)
     navigate(`/project/${project.id}`)
   }
 
@@ -41,8 +51,45 @@ export function ProjectCreate() {
               }}
               autoFocus
             />
-            {error && <p className="form-error">{error}</p>}
           </div>
+
+          <div className="form-field-row">
+            <div className="form-field">
+              <label htmlFor="project-start-date" className="form-label">
+                Start Date
+              </label>
+              <input
+                id="project-start-date"
+                type="date"
+                className="form-input"
+                required
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value)
+                  if (error) setError(null)
+                }}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="project-end-date" className="form-label">
+                End Date
+              </label>
+              <input
+                id="project-end-date"
+                type="date"
+                className="form-input"
+                required
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value)
+                  if (error) setError(null)
+                }}
+              />
+            </div>
+          </div>
+
+          {error && <p className="form-error">{error}</p>}
+
           <div className="form-actions">
             <button
               type="button"

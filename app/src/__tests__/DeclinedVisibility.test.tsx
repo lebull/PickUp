@@ -66,8 +66,15 @@ function renderSubmissionList(args: {
   assignments: SlotAssignment[]
   discarded?: string[]
   showStageAssignments?: boolean
+  showMoonlightColumns?: boolean
 }) {
-  const { submissions, assignments, discarded = [], showStageAssignments = true } = args
+  const {
+    submissions,
+    assignments,
+    discarded = [],
+    showStageAssignments = true,
+    showMoonlightColumns = true,
+  } = args
   return render(
     <SubmissionList
       submissions={submissions}
@@ -81,6 +88,7 @@ function renderSubmissionList(args: {
       cursorIndex={null}
       lineupSubmissionNumbers={new Set(assignments.filter((a) => a.type === 'dj').map((a) => a.submissionNumber))}
       discardedSubmissionNumbers={new Set(discarded)}
+      showMoonlightColumns={showMoonlightColumns}
       hiddenNames={false}
       listRef={createRef<HTMLDivElement>()}
       onHeaderClick={vi.fn()}
@@ -123,6 +131,18 @@ function renderSubmissionDetail(project: Project, submission: Submission) {
 }
 
 describe('Declined visibility in submission list', () => {
+  it('hides ML-specific columns when moonlight is disabled', () => {
+    const submissions = [makeSubmission('S001', 'DJ Alpha')]
+    renderSubmissionList({
+      submissions,
+      assignments: [],
+      showMoonlightColumns: false,
+    })
+
+    expect(screen.queryByText('ML Score')).toBeNull()
+    expect(screen.queryByText('Vibefit')).toBeNull()
+  })
+
   it('shows declined badge and suppresses duplicate badge for declined rows', () => {
     const submissions = [makeSubmission('S001', 'DJ Alpha'), makeSubmission('S002', 'DJ Alpha')]
     renderSubmissionList({
@@ -169,11 +189,75 @@ describe('Declined visibility in submission list', () => {
 })
 
 describe('Declined visibility in submission detail', () => {
+  it('shows Judge 3 scores and notes in the detail panel', () => {
+    const submission = {
+      ...makeSubmission('S001', 'DJ Alpha'),
+      j3Technical: 8,
+      j3Flow: 7,
+      j3Entertainment: 9,
+      j3Notes: 'Judge 3 comments',
+      mainScore: { avg: 8, sum: 24, partial: false },
+    }
+
+    renderSubmissionDetail({
+      id: 'project-1',
+      name: 'Test',
+      startDate: '2026-03-27',
+      endDate: '2026-03-30',
+      csvText: '',
+      stages: [sequentialStage],
+      assignments: [],
+      discardedSubmissions: [],
+      rowCount: 1,
+      createdAt: '2026-03-27T00:00:00.000Z',
+      updatedAt: '2026-03-27T00:00:00.000Z',
+      submissionConverterId: 'nyff-2025-moonlight',
+    }, submission)
+
+    expect(screen.getByText('Judge 3')).toBeTruthy()
+    expect(screen.getByText('Judge 3 comments')).toBeTruthy()
+    expect(screen.getAllByText('8.00')[0]).toBeTruthy()
+  })
+
+  it('hides moonlight detail sections for standard-format projects', () => {
+    const submission = {
+      ...makeSubmission('S002', 'DJ Standard'),
+      moonlightInterest: true,
+      mlGenre: 'Progressive',
+      mlSubmissionLink: 'https://example.com/ml',
+      mlTechnical: 8,
+      mlFlow: 7,
+      mlEntertainment: 6,
+      mlNotes: 'Moonlight note',
+      mlScore: { avg: 7, sum: 21 },
+    }
+
+    renderSubmissionDetail({
+      id: 'project-2',
+      name: 'Test',
+      startDate: '2026-03-27',
+      endDate: '2026-03-30',
+      csvText: '',
+      stages: [sequentialStage],
+      assignments: [],
+      discardedSubmissions: [],
+      rowCount: 1,
+      createdAt: '2026-03-27T00:00:00.000Z',
+      updatedAt: '2026-03-27T00:00:00.000Z',
+      submissionConverterId: 'nyff-2026-standard',
+    }, submission)
+
+    expect(screen.queryByText('Moonlight Festival')).toBeNull()
+    expect(screen.queryByText('ML Score')).toBeNull()
+  })
+
   it('shows top-of-detail declined notice with sequential slot context', () => {
     const submission = makeSubmission('S001', 'DJ Alpha')
     const project: Project = {
       id: 'project-1',
       name: 'Test',
+      startDate: '2026-03-27',
+      endDate: '2026-03-30',
       csvText: '',
       stages: [sequentialStage],
       assignments: [
@@ -213,6 +297,8 @@ describe('Declined visibility in submission detail', () => {
     const project: Project = {
       id: 'project-1',
       name: 'Test',
+      startDate: '2026-03-27',
+      endDate: '2026-03-30',
       csvText: '',
       stages: [simultaneousStage],
       assignments: [

@@ -93,7 +93,9 @@ export function ProjectList() {
                   {project.name}
                 </button>
                 <span className="project-list-item__meta">
-                  Updated {new Date(project.updatedAt).toLocaleDateString()}
+                  {project.startDate && project.endDate
+                    ? `${new Date(project.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(project.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+                    : 'Dates required'}
                 </span>
                 <div className="project-list-item__actions">
                   <button

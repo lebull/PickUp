@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatTimeLabel, getEveningTimeAxis, getSlotLabels } from '../lineupUtils.ts'
+import { formatTimeLabel, getEveningTimeAxis, getSlotLabels, getSimultaneousRowRange, getProjectDayNames } from '../lineupUtils.ts'
 import type { Stage } from '../types.ts'
 
 describe('formatTimeLabel', () => {
@@ -100,6 +100,71 @@ describe('getEveningTimeAxis – multi-event stages', () => {
     const stage = makeSequentialStage('main', [{ startTime: '20:00', endTime: '24:00' }])
     expect(getSlotLabels(stage, 'Friday', 0)).toEqual(['20:00', '21:00', '22:00', '23:00'])
     expect(getEveningTimeAxis([stage], 'Friday')).toEqual(['20:00', '21:00', '22:00', '23:00'])
+  })
+
+  it('supports legacy string slotDuration values when deriving slot labels', () => {
+    const stage = {
+      ...makeSequentialStage('legacy-main', [{ startTime: '12:00', endTime: '15:00' }]),
+      slotDuration: '90' as unknown as number,
+    }
+    expect(getSlotLabels(stage, 'Friday', 0)).toEqual(['12:00', '13:30'])
+  })
+
+  it('resolves day schedules even when stored key casing differs', () => {
+    const stage: Stage = {
+      id: 'case-main',
+      name: 'Case Main',
+      stageType: 'sequential',
+      activeDays: ['Wednesday'],
+      schedule: {
+        ' wednesday ': [{ startTime: '12:00', endTime: '15:00' }],
+      },
+      slotDuration: 90,
+    }
+
+    expect(getSlotLabels(stage, 'Wednesday', 0)).toEqual(['12:00', '13:30'])
+  })
+
+  it('keeps overnight simultaneous events visible through the next-day boundary', () => {
+    const stage: Stage = {
+      id: 'sim-night',
+      name: 'Late Night',
+      stageType: 'simultaneous',
+      activeDays: ['Friday'],
+      schedule: { Friday: [{ startTime: '23:00', endTime: '02:00' }] },
+      slotDuration: 60,
+    }
+
+    const axis = getEveningTimeAxis([stage], 'Friday')
+    expect(axis).toEqual(['23:00', '00:00', '01:00'])
+    expect(getSimultaneousRowRange(stage, 'Friday', axis, 0)).toEqual({
+      gridRowStart: 2,
+      gridRowEnd: 5,
+    })
+  })
+
+  it('includes real slot starts even when they do not align to the shared axis step', () => {
+    const alignedStage = makeSequentialStage('aligned', [
+      { startTime: '12:00', endTime: '15:00' },
+    ])
+
+    const offsetStage = makeSequentialStage('offset', [
+      { startTime: '12:15', endTime: '15:15' },
+    ])
+
+    const axis = getEveningTimeAxis([alignedStage, offsetStage], 'Friday')
+    expect(axis).toContain('12:00')
+    expect(axis).toContain('13:00')
+    expect(axis).toContain('12:15')
+    expect(axis).toContain('13:15')
+  })
+
+  it('builds day labels from the project date range instead of the legacy Thursday–Sunday default', () => {
+    expect(getProjectDayNames('2026-12-30', '2027-01-01')).toEqual([
+      'Wednesday',
+      'Thursday',
+      'Friday',
+    ])
   })
 })
 

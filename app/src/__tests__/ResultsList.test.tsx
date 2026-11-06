@@ -64,6 +64,8 @@ function makeProject(): Project {
   return {
     id: 'project-1',
     name: 'PickUp Test Project',
+    startDate: '2026-03-27',
+    endDate: '2026-03-30',
     csvText: '',
     stages: [testStage],
     assignments: [

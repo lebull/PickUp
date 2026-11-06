@@ -7,6 +7,7 @@ import { SubmissionDetail } from './SubmissionDetail.tsx'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { SplitPane } from './SplitPane.tsx'
 import { isSlotAssignment } from '../types.ts'
+import { getSubmissionConverter } from '../submissionConverters.ts'
 function SubmissionDetailRoute() {
   const { djIndex } = useParams<{ djIndex: string }>()
   const { submissions } = useProjectContext()
@@ -44,6 +45,8 @@ export function SubmissionsView() {
   if (submissions === null) return null
 
   const hasSelection = djIndex !== undefined
+  const converter = getSubmissionConverter(project.submissionConverterId)
+  const showMoonlightColumns = project.supportsMoonlight ?? converter.supportsMoonlight
 
   // Derive lineup submission numbers from project assignments
   const lineupSubmissionNumbers = new Set(project.assignments.filter((a) => a.type === 'dj').map((a) => a.submissionNumber))
@@ -83,6 +86,7 @@ export function SubmissionsView() {
           cursorIndex={cursorIndex}
           lineupSubmissionNumbers={lineupSubmissionNumbers}
           discardedSubmissionNumbers={discardedSubmissionNumbers}
+          showMoonlightColumns={showMoonlightColumns}
           hiddenNames={hiddenNames}
           onHeaderClick={handleHeaderClick}
           onMetricChange={setScoreMetric}

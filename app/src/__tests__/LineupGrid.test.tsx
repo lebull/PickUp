@@ -94,6 +94,8 @@ function renderGrid(stages: Stage[], submissions: Submission[], assignments: Slo
         submissions={submissions}
         stages={stages}
         assignments={assignments}
+        projectStartDate="2026-03-27"
+        projectEndDate="2026-03-30"
         selectedEvening="Friday"
         onSelectEvening={vi.fn()}
         onAssign={vi.fn()}

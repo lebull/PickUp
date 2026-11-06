@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
 import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventType } from '../lineupUtils.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventType, getProjectDayNames, getScheduleEventsForDay } from '../lineupUtils.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { hexToTint } from '../stageColors.ts'
 import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
@@ -10,6 +10,8 @@ interface Props {
   submissions: Submission[]
   stages: Stage[]
   assignments: SlotAssignment[]
+  projectStartDate?: string
+  projectEndDate?: string
   selectedEvening: string
   onSelectEvening: (evening: string) => void
   onAssign: (stageId: string, evening: string, slotIndex: number, submissionNumber: string, eventIndex: number) => void
@@ -29,6 +31,8 @@ export function LineupGrid({
   submissions,
   stages,
   assignments,
+  projectStartDate,
+  projectEndDate,
   selectedEvening,
   onSelectEvening,
   onAssign,
@@ -56,8 +60,9 @@ export function LineupGrid({
     for (const stage of stages) {
       for (const day of stage.activeDays ?? []) daySet.add(day)
     }
-    return ['Thursday', 'Friday', 'Saturday', 'Sunday'].filter((d) => daySet.has(d))
-  }, [stages])
+    const projectDays = getProjectDayNames(projectStartDate, projectEndDate)
+    return projectDays.filter((d) => daySet.has(d))
+  }, [projectEndDate, projectStartDate, stages])
 
   const evening = activeEvenings.includes(selectedEvening)
     ? selectedEvening
@@ -93,7 +98,7 @@ export function LineupGrid({
   }, [stages])
 
   function getTimedEvents(stage: Stage, day: string) {
-    return (stage.schedule?.[day] ?? []).filter((event) => getStageEventType(event) !== 'special')
+    return getScheduleEventsForDay(stage.schedule, day).filter((event) => getStageEventType(event) !== 'special')
   }
 
   function getAssignment(stageId: string, eventIndex: number, slotIndex: number): SlotAssignment | undefined {
@@ -132,6 +137,56 @@ export function LineupGrid({
 
   function getStageUseMoonlight(stageId: string): boolean {
     return stages.find((s) => s.id === stageId)?.useMoonlightScores ?? false
+  }
+
+  function handleStageHeaderClick(stage: Stage) {
+    if (stage.stageType === 'simultaneous') {
+      const dayEvents = getTimedEvents(stage, evening)
+      const candidateEventIndices = dayEvents.length > 0
+        ? dayEvents.map((_, idx) => idx)
+        : [0]
+
+      const targetEventIndex = candidateEventIndices.find((idx) => nextSimultaneousPosition(stage.id, idx) !== null) ?? candidateEventIndices[0]
+      const positionIndex = nextSimultaneousPosition(stage.id, targetEventIndex) ?? 1
+
+      onSimultaneousClick({
+        stageId: stage.id,
+        evening,
+        positionIndex,
+        timeLabel: '—',
+        eventIndex: targetEventIndex,
+      })
+      return
+    }
+
+    let fallback: { eventIndex: number; slotIndex: number; timeLabel: string } | null = null
+    const dayEvents = getScheduleEventsForDay(stage.schedule, evening)
+
+    for (let eventIndex = 0; eventIndex < dayEvents.length; eventIndex++) {
+      const labels = getSlotLabels(stage, evening, eventIndex)
+      if (labels.length === 0) continue
+
+      if (!fallback) {
+        fallback = { eventIndex, slotIndex: 0, timeLabel: labels[0] }
+      }
+
+      for (let slotIndex = 0; slotIndex < labels.length; slotIndex++) {
+        if (!getAssignment(stage.id, eventIndex, slotIndex)) {
+          onSlotClick({ stageId: stage.id, evening, slotIndex, eventIndex, timeLabel: labels[slotIndex] })
+          return
+        }
+      }
+    }
+
+    if (fallback) {
+      onSlotClick({
+        stageId: stage.id,
+        evening,
+        slotIndex: fallback.slotIndex,
+        eventIndex: fallback.eventIndex,
+        timeLabel: fallback.timeLabel,
+      })
+    }
   }
 
   function nextSimultaneousPosition(stageId: string, eventIndex: number): 1 | 2 | 3 | null {
@@ -191,8 +246,17 @@ export function LineupGrid({
           {stageColumns.map(({ stage }) => (
             <div
               key={`header-${stage.id}`}
-              className="grid-cell grid-header grid-stage-header"
+              className="grid-cell grid-header grid-stage-header grid-stage-header--clickable"
               style={stageColorMap[stage.id] ? { borderBottom: `3px solid ${stageColorMap[stage.id]}` } : undefined}
+              role="button"
+              tabIndex={0}
+              onClick={() => handleStageHeaderClick(stage)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleStageHeaderClick(stage)
+                }
+              }}
             >
               {stage.name || <em>Unnamed Stage</em>}
               {stage.stageType === 'simultaneous' && (
@@ -348,7 +412,7 @@ export function LineupGrid({
                     }
 
                     // Sequential stage: find which event (if any) owns this time label.
-                    const dayEvents = stage.schedule?.[evening] ?? []
+                    const dayEvents = getScheduleEventsForDay(stage.schedule, evening)
                     let eventIndex = -1
                     let slotIndex = -1
                     for (let ei = 0; ei < dayEvents.length; ei++) {

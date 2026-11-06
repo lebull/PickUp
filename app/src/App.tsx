@@ -13,6 +13,7 @@ import { ProjectContext } from './ProjectContext.ts'
 import { AppPreferencesContext, useAppPreferencesState } from './AppPreferencesContext.ts'
 import { NavActionsMenu } from './components/NavActionsMenu.tsx'
 import { AuthGate } from './components/AuthGate.tsx'
+import { CsvImport } from './components/CsvImport.tsx'
 
 // ── Project Workspace ────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function ProjectWorkspace() {
       let subs: Submission[] | null = null
       if (p.csvText) {
         try {
-          subs = parseSubmissions(p.csvText)
+          subs = parseSubmissions(p.csvText, p.submissionConverterId)
           setSubmissions(subs)
           if (p.rowCount > 0 && p.rowCount !== subs.length) setRowCountMismatch(true)
         } catch {
@@ -80,12 +81,13 @@ function ProjectWorkspace() {
     }
   }, [project, autoSave])
 
-  async function handleImport(subs: Submission[], _fileName: string, csvText: string) {
+  async function handleImport(subs: Submission[], _fileName: string, csvText: string, converterId: string) {
     if (!project) return
     const mismatch = project.stages.length > 0 && subs.length !== project.rowCount
     const updated: Project = {
       ...project,
       csvText,
+      submissionConverterId: converterId,
       rowCount: subs.length,
     }
     setProject(updated)
@@ -142,6 +144,8 @@ function ProjectWorkspace() {
     )
   }
 
+  const hasRequiredDates = Boolean(project.startDate && project.endDate)
+
   return (
     <ProjectContext.Provider value={{ project, setProject, submissions, setSubmissions, rowCountMismatch, setRowCountMismatch, toggleDiscardSubmission: handleToggleDiscard, setAcceptanceStatus: handleSetAcceptanceStatus, replaceWithDeclineHistory: handleReplaceWithDeclineHistory }}>
       <div className="app">
@@ -171,15 +175,30 @@ function ProjectWorkspace() {
             </nav>
           )}
           <div className="header-actions">
-            <NavActionsMenu project={project} onImport={handleImport} />
+            <NavActionsMenu
+              project={project}
+              onImport={handleImport}
+              onProjectChange={(updated) => {
+                setProject(updated)
+                saveProject(updated)
+              }}
+            />
           </div>
         </header>
 
         <main className="app-main">
-          {submissions === null ? (
+          {!hasRequiredDates ? (
+            <div className="empty-state">
+              <p className="empty-state-message">Project start and end dates are required.</p>
+              <p className="empty-state-message">Open Settings to set both dates before continuing.</p>
+            </div>
+          ) : submissions === null ? (
             <div className="drop-zone">
               <div className="drop-zone-inner">
-                <p className="drop-zone-prompt">Use the Import CSV button above to load submissions.</p>
+                <p className="drop-zone-prompt">Import submissions to start this project. You can use the button below or open Settings.</p>
+                <div className="drop-zone-import-actions">
+                  <CsvImport onImport={handleImport} />
+                </div>
               </div>
             </div>
           ) : (

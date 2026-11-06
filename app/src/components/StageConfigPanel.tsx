@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react'
 import type { Stage, StageSchedule, SlotAssignment } from '../types.ts'
-import { CONVENTION_DAYS, getSlotLabels, getEventLabel, eventsOverlap, getStageEventType } from '../lineupUtils.ts'
+import { getProjectDayNames, getSlotLabels, getEventLabel, eventsOverlap, getStageEventType } from '../lineupUtils.ts'
 import { STAGE_COLOR_PALETTE } from '../stageColors.ts'
 
 interface Props {
   stages: Stage[]
   assignments: SlotAssignment[]
+  projectStartDate?: string
+  projectEndDate?: string
   onSave: (stages: Stage[]) => void
   onClose: () => void
 }
@@ -41,7 +43,8 @@ function hasOverlap(events: StageSchedule[], selfIdx: number): boolean {
   return false
 }
 
-export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props) {
+export function StageConfigPanel({ stages, assignments, projectStartDate, projectEndDate, onSave, onClose }: Props) {
+  const availableDays = getProjectDayNames(projectStartDate, projectEndDate)
   const [draft, setDraft] = useState<Stage[]>(() =>
     stages.map((s) => ({
       ...s,
@@ -301,7 +304,7 @@ export function StageConfigPanel({ stages, assignments, onSave, onClose }: Props
                         <p className="stage-helper-text">
                           Enable a day, then set each event row Event Type to Timed Event or Special Event.
                         </p>
-                      {CONVENTION_DAYS.map((day) => {
+                      {availableDays.map((day) => {
                         const isActive = (stage.activeDays ?? []).includes(day)
                         const events = isActive ? ((stage.schedule?.[day]) ?? [makeTimedEvent()]) : []
 

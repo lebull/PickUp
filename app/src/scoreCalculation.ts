@@ -18,7 +18,7 @@ export function computeJudgeAvg(
 export interface MainScore {
   avg: number | null
   sum: number | null
-  /** true when only one of the two judges has scored */
+  /** true when fewer than the full judge panel has scored */
   partial: boolean
 }
 
@@ -51,7 +51,7 @@ export function computeMainScore(row: string[], COL: ColIndex): MainScore {
   }
 
   const judgeCount = [hasJ1, hasJ2, hasJ3].filter(Boolean).length
-  const partial = judgeCount < 2
+  const partial = judgeCount > 0 && judgeCount < 3
 
   const scores = [j1Avg, j2Avg, j3Avg].filter((s): s is number => s !== null)
   const avg = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 100) / 100

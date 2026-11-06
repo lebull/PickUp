@@ -1,13 +1,24 @@
-import { describe, it, expect, vi } from 'vitest'
-import { normalizeProject, applySetAcceptanceStatus, applyReplaceWithDeclineHistory } from '../projectStore'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
+import { setDoc } from 'firebase/firestore'
+import { normalizeProject, applySetAcceptanceStatus, applyReplaceWithDeclineHistory, createProject } from '../projectStore'
 import type { Project, SlotCoord } from '../types'
 
-vi.mock('../firebase', () => ({ auth: { currentUser: null }, db: {} }))
+vi.mock('../firebase', () => ({ auth: { currentUser: { uid: 'user-123' } }, db: {} }))
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(() => 'projects'),
+  doc: vi.fn((...args) => args),
+  getDoc: vi.fn(),
+  getDocs: vi.fn(),
+  setDoc: vi.fn(),
+  deleteDoc: vi.fn(),
+}))
 
 function makeBaseProject(): Project {
   return {
     id: 'project-1',
     name: 'Test Project',
+    startDate: '2026-03-27',
+    endDate: '2026-03-30',
     csvText: '',
     stages: [],
     assignments: [],
@@ -17,6 +28,25 @@ function makeBaseProject(): Project {
     updatedAt: '2026-03-27T00:00:00.000Z',
   }
 }
+
+describe('project dates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('stores project-level start and end dates when creating a project', async () => {
+    await createProject('Winter Festival', '2026-12-30', '2027-01-01')
+
+    expect(setDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        name: 'Winter Festival',
+        startDate: '2026-12-30',
+        endDate: '2027-01-01',
+      })
+    )
+  })
+})
 
 describe('projectStore normalization', () => {
   it('defaults missing legacy stageType to sequential', () => {

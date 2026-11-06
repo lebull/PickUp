@@ -2,12 +2,13 @@ import Papa from 'papaparse'
 import { buildColIndex } from './csvColumns.ts'
 import { parseScore, computeMainScore, computeMLScore } from './scoreCalculation.ts'
 import type { Submission } from './types.ts'
+import { getSubmissionConverter } from './submissionConverters.ts'
 
 function str(row: string[], idx: number): string {
   return (row[idx] ?? '').trim()
 }
 
-export function parseSubmissions(csvText: string): Submission[] {
+export function parseSubmissions(csvText: string, converterId?: string): Submission[] {
   const result = Papa.parse<string[]>(csvText, {
     skipEmptyLines: true,
   })
@@ -15,7 +16,8 @@ export function parseSubmissions(csvText: string): Submission[] {
   const rows = result.data as string[][]
   if (rows.length < 2) return []
 
-  const COL = buildColIndex(rows[0])
+  const converter = getSubmissionConverter(converterId)
+  const COL = buildColIndex(rows[0], converter.headers)
 
   const parsed = rows.slice(1).map((row): Submission => ({
     submissionNumber: str(row, COL.SUBMISSION_NUMBER),

@@ -3,6 +3,7 @@ import type { Submission } from '../types.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
 import { useProjectContext } from '../ProjectContext.ts'
 import { getSubmissionDeclinedNotice } from '../declinedContext.ts'
+import { getSubmissionConverter } from '../submissionConverters.ts'
 
 function val(s: string | null | undefined): string {
   return s?.trim() || '—'
@@ -19,10 +20,11 @@ function rawScore(n: number | null): string {
 interface SummaryProps {
   submission: Submission
   anonymousLabel: string
+  supportsMoonlight: boolean
 }
 
-function SubmissionSummary({ submission: s, anonymousLabel: _anonymousLabel }: SummaryProps) {
-  const mlScore = s.moonlightInterest && s.mlScore.avg !== null
+function SubmissionSummary({ submission: s, anonymousLabel: _anonymousLabel, supportsMoonlight }: SummaryProps) {
+  const mlScore = supportsMoonlight && s.moonlightInterest && s.mlScore.avg !== null
     ? s.mlScore.avg.toFixed(2)
     : '—'
   return (
@@ -32,13 +34,15 @@ function SubmissionSummary({ submission: s, anonymousLabel: _anonymousLabel }: S
           <span className="detail-summary-label">Main Score</span>
           <span className="detail-summary-value">
             {numVal(s.mainScore.avg)}
-            {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored"> *</span>}
+            {s.mainScore.partial && <span className="partial-badge" title="Fewer than all judges have scored"> *</span>}
           </span>
         </div>
-        <div className="detail-summary-item">
-          <span className="detail-summary-label">ML Score</span>
-          <span className="detail-summary-value">{mlScore}</span>
-        </div>
+        {supportsMoonlight && (
+          <div className="detail-summary-item">
+            <span className="detail-summary-label">ML Score</span>
+            <span className="detail-summary-value">{mlScore}</span>
+          </div>
+        )}
       </>
       <div className="detail-summary-item">
         <span className="detail-summary-label">Genre</span>
@@ -84,6 +88,7 @@ interface Props {
 export function SubmissionDetail({ submission: s, onBack }: Props) {
   const { hiddenNames, timeFormat } = useAppPreferences()
   const { project, toggleDiscardSubmission } = useProjectContext()
+  const supportsMoonlight = getSubmissionConverter(project.submissionConverterId).supportsMoonlight
   const isDiscarded = (project.discardedSubmissions ?? []).includes(s.submissionNumber)
   const declinedNotice = getSubmissionDeclinedNotice(project, s.submissionNumber, timeFormat)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -111,7 +116,7 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
   const anonymousLabel = `DJ #${s.submissionNumber}`
   const displayName = hiddenNames ? anonymousLabel : s.djName
 
-  const moonlightSection = s.moonlightInterest && (
+  const moonlightSection = supportsMoonlight && s.moonlightInterest && (
     <Section title="Moonlight Festival">
       <Field label="ML Genre" value={val(s.mlGenre)} />
       <Field label="ML Submission Link" value={val(s.mlSubmissionLink)} />
@@ -137,26 +142,45 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
     </Section>
   )
 
+  const judgeBlocks = [
+    {
+      judge: 1,
+      technical: s.j1Technical,
+      flow: s.j1Flow,
+      entertainment: s.j1Entertainment,
+      notes: s.j1Notes,
+    },
+    {
+      judge: 2,
+      technical: s.j2Technical,
+      flow: s.j2Flow,
+      entertainment: s.j2Entertainment,
+      notes: s.j2Notes,
+    },
+    {
+      judge: 3,
+      technical: s.j3Technical,
+      flow: s.j3Flow,
+      entertainment: s.j3Entertainment,
+      notes: s.j3Notes,
+    },
+  ]
+
   const mainScoreSection = (
     <Section title="Judge Scores">
-      <div className="judge-block">
-        <h3>Judge 1</h3>
-        <Field label="Technical" value={rawScore(s.j1Technical)} />
-        <Field label="Flow" value={rawScore(s.j1Flow)} />
-        <Field label="Entertainment" value={rawScore(s.j1Entertainment)} />
-        {s.j1Notes && <Field label="Notes" value={s.j1Notes} />}
-      </div>
-      <div className="judge-block">
-        <h3>Judge 2</h3>
-        <Field label="Technical" value={rawScore(s.j2Technical)} />
-        <Field label="Flow" value={rawScore(s.j2Flow)} />
-        <Field label="Entertainment" value={rawScore(s.j2Entertainment)} />
-        {s.j2Notes && <Field label="Notes" value={s.j2Notes} />}
-      </div>
+      {judgeBlocks.map(({ judge, technical, flow, entertainment, notes }) => (
+        <div key={judge} className="judge-block">
+          <h3>{`Judge ${judge}`}</h3>
+          <Field label="Technical" value={rawScore(technical)} />
+          <Field label="Flow" value={rawScore(flow)} />
+          <Field label="Entertainment" value={rawScore(entertainment)} />
+          {notes && <Field label="Notes" value={notes} />}
+        </div>
+      ))}
       <div className="final-score">
         <strong>Final Main Score:</strong>{' '}
         {numVal(s.mainScore.avg)}
-        {s.mainScore.partial && <span className="partial-badge" title="Only one judge has scored"> *partial*</span>}
+        {s.mainScore.partial && <span className="partial-badge" title="Fewer than all judges have scored"> *partial*</span>}
         {s.mainScore.sum !== null && <span className="score-sum"> (sum: {s.mainScore.sum})</span>}
       </div>
     </Section>
@@ -199,7 +223,7 @@ export function SubmissionDetail({ submission: s, onBack }: Props) {
         </div>
       )}
 
-      <SubmissionSummary submission={s} anonymousLabel={anonymousLabel} />
+      <SubmissionSummary submission={s} anonymousLabel={anonymousLabel} supportsMoonlight={supportsMoonlight} />
 
       <Section title="Basic Info">
         <Field label="DJ Name" value={hiddenNames ? anonymousLabel : val(s.djName)} />

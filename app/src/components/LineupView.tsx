@@ -9,13 +9,16 @@ import type { ActiveSlot } from './DJSelectionPanel.tsx'
 import type { Stage, SlotAssignment, SlotCoord, Assignment } from '../types.ts'
 import { isSimultaneousCoord, isSlotAssignment } from '../types.ts'
 import { SplitPane } from './SplitPane.tsx'
-import { getSlotLabels } from '../lineupUtils.ts'
+import { getProjectDayNames, getSlotLabels } from '../lineupUtils.ts'
 import { hexToTint } from '../stageColors.ts'
 import { useAppPreferences } from '../AppPreferencesContext.ts'
+import { getSubmissionConverter } from '../submissionConverters.ts'
 
 export function LineupView() {
   const { project, setProject, submissions, rowCountMismatch, setRowCountMismatch } = useProjectContext()
   const { hiddenNames } = useAppPreferences()
+  const converter = getSubmissionConverter(project.submissionConverterId)
+  const projectSupportsMoonlight = project.supportsMoonlight ?? converter.supportsMoonlight
 
   const [showStageConfig, setShowStageConfig] = useState(false)
   const [activeSlot, setActiveSlot] = useState<ActiveSlot | null>(null)
@@ -43,12 +46,13 @@ export function LineupView() {
     for (const stage of project.stages) {
       for (const d of stage.activeDays ?? []) daySet.add(d)
     }
-    return ['Thursday', 'Friday', 'Saturday', 'Sunday'].filter((d) => daySet.has(d))
-  }, [project.stages])
+    return getProjectDayNames(project.startDate, project.endDate).filter((d) => daySet.has(d))
+  }, [project.endDate, project.startDate, project.stages])
 
   const selectedEvening =
     activeEvenings.find((e) => e.toLowerCase() === day?.toLowerCase()) ??
     activeEvenings[0] ??
+    day ??
     'Thursday'
 
   /** Returns the next empty sequential ActiveSlot within the same stage event, or null if none. */
@@ -403,9 +407,12 @@ export function LineupView() {
     setActiveSlot(null)
   }
 
-  if (!day) {
-    const target = activeEvenings[0]?.toLowerCase() ?? 'thursday'
-    return <Navigate replace to={`/project/${project.id}/lineup/${target}`} />
+  if (!day && activeEvenings.length > 0) {
+    return <Navigate replace to={`/project/${project.id}/lineup/${activeEvenings[0].toLowerCase()}`} />
+  }
+
+  if (day && activeEvenings.length > 0 && !activeEvenings.some((e) => e.toLowerCase() === day.toLowerCase())) {
+    return <Navigate replace to={`/project/${project.id}/lineup/${activeEvenings[0].toLowerCase()}`} />
   }
 
   if (submissions === null) return null
@@ -498,6 +505,8 @@ export function LineupView() {
                   submissions={submissions}
                   stages={stageViewStages}
                   assignments={slotAssignments}
+                  projectStartDate={project.startDate}
+                  projectEndDate={project.endDate}
                   activeStageId={activeStageId}
                   onSlotClick={setActiveSlot}
                   onAssign={handleAssign}
@@ -600,6 +609,8 @@ export function LineupView() {
                 submissions={submissions}
                 stages={project.stages}
                 assignments={slotAssignments}
+                projectStartDate={project.startDate}
+                projectEndDate={project.endDate}
                 selectedEvening={selectedEvening}
                 onSelectEvening={handleSelectEvening}
                 onAssign={handleAssign}
@@ -625,6 +636,7 @@ export function LineupView() {
             stages={project.stages}
             assignments={slotAssignments}
             discardedSubmissionNumbers={new Set(project.discardedSubmissions ?? [])}
+            projectSupportsMoonlight={projectSupportsMoonlight}
             activeSlot={activeSlot}
             currentEvening={selectedEvening}
             onAssign={handleAssign}
@@ -645,6 +657,8 @@ export function LineupView() {
         <StageConfigPanel
           stages={project.stages}
           assignments={slotAssignments}
+          projectStartDate={project.startDate}
+          projectEndDate={project.endDate}
           onSave={handleSaveStages}
           onClose={() => setShowStageConfig(false)}
         />

@@ -1,10 +1,8 @@
 /**
- * Canonical header substrings for each logical column.
- * Each value is matched case-insensitively against the actual CSV header row.
- * For columns that share the same prefix (e.g. multiple "Judge 2" columns),
- * provide enough context to uniquely identify the right one.
+ * Logical keys used by submission parsers. Individual converters provide the
+ * header text for any keys they support.
  */
-export const COL_HEADERS = {
+export const ALL_COL_KEYS = {
   SUBMISSION_NUMBER:  'Submission #',
   TIMESTAMP:          'Timestamp',
   EMAIL:              'Email Address',
@@ -49,22 +47,31 @@ export const COL_HEADERS = {
   ML_NOTES:           'Judge ML: Notes',
 } as const
 
-export type ColKey = keyof typeof COL_HEADERS
+export type ColKey = keyof typeof ALL_COL_KEYS
 export type ColIndex = Record<ColKey, number>
 
 /**
- * Resolves the header-name map into a numeric index map by scanning the
- * actual CSV header row.  Logs a warning for any column that cannot be found.
+ * Resolves a converter header map into a numeric index map by scanning the
+ * actual CSV header row.
  */
-export function buildColIndex(headerRow: string[]): ColIndex {
+export function buildColIndex(
+  headerRow: string[],
+  headerMap: Partial<Record<ColKey, string>>
+): ColIndex {
   const lower = headerRow.map((h) => h.toLowerCase())
   const index = {} as ColIndex
 
-  for (const key of Object.keys(COL_HEADERS) as ColKey[]) {
-    const needle = COL_HEADERS[key].toLowerCase()
+  for (const key of Object.keys(ALL_COL_KEYS) as ColKey[]) {
+    const header = headerMap[key]
+    if (!header) {
+      index[key] = -1
+      continue
+    }
+    const needle = header.toLowerCase()
+
     const idx = lower.findIndex((h) => h.includes(needle))
     if (idx === -1) {
-      console.warn(`[CSV] Could not find column for "${key}" (looking for "${COL_HEADERS[key]}")`)
+      console.warn(`[CSV] Could not find column for "${key}" (looking for "${header}")`)
     }
     index[key] = idx
   }

@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { LineupView } from '../components/LineupView'
 import { ProjectContext, type ProjectContextValue } from '../ProjectContext'
 import { AppPreferencesContext } from '../AppPreferencesContext'
 import type { Project, Submission } from '../types'
 
-function makeSubmission(id: string, name: string): Submission {
+function makeSubmission(id: string, name: string, overrides: Partial<Submission> = {}): Submission {
   return {
     submissionNumber: id,
     djName: name,
@@ -48,6 +48,7 @@ function makeSubmission(id: string, name: string): Submission {
     mlNotes: '',
     mainScore: { avg: null, sum: null, partial: false },
     mlScore: { avg: null, sum: null },
+    ...overrides,
   }
 }
 
@@ -55,6 +56,8 @@ function makeProject(): Project {
   return {
     id: 'project-1',
     name: 'Test Project',
+    startDate: '2026-03-27',
+    endDate: '2026-03-30',
     csvText: '',
     stages: [
       {
@@ -81,15 +84,17 @@ function makeProject(): Project {
   }
 }
 
-function renderLineup(options: { hiddenNames?: boolean } = {}) {
-  const { hiddenNames = false } = options
+function renderLineup(options: { hiddenNames?: boolean; submissions?: Submission[] } = {}) {
+  const { hiddenNames = false, submissions: initialSubmissions } = options
 
   function Harness() {
     const [project, setProject] = useState<Project | null>(makeProject())
-    const [submissions, setSubmissions] = useState<Submission[] | null>([
-      makeSubmission('S001', 'DJ Alpha'),
-      makeSubmission('S002', 'DJ Beta'),
-    ])
+    const [submissions, setSubmissions] = useState<Submission[] | null>(
+      initialSubmissions ?? [
+        makeSubmission('S001', 'DJ Alpha'),
+        makeSubmission('S002', 'DJ Beta'),
+      ]
+    )
     const [rowCountMismatch, setRowCountMismatch] = useState(false)
 
     if (!project) return null
@@ -136,6 +141,22 @@ describe('LineupView special events mode', () => {
     expect(screen.getByRole('button', { name: 'Day View' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Stage View' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Special Events' })).toBeTruthy()
+  })
+
+  it('clicking a day-view stage header opens slot context with availability filtering', async () => {
+    const user = userEvent.setup()
+    renderLineup({
+      submissions: [
+        makeSubmission('S001', 'DJ Alpha', { daysAvailable: 'Wednesday, Friday' }),
+        makeSubmission('S002', 'DJ Beta', { daysAvailable: 'Thursday' }),
+      ],
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Main Stage' }))
+
+    expect(screen.getAllByText('Empty — drag a DJ here').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Assign DJ Alpha' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Assign DJ Beta' })).toBeNull()
   })
 
   it('lets user assign a DJ from Special Events mode', async () => {
@@ -199,5 +220,61 @@ describe('LineupView special events mode', () => {
 
     expect(screen.queryByText('DJ Alpha')).toBeNull()
     expect(screen.getAllByText('DJ #1').length).toBeGreaterThan(0)
+  })
+
+  it('redirects invalid day routes to the project’s actual active day instead of staying on Thursday', () => {
+    function PathProbe() {
+      const location = useLocation()
+      return <div data-testid="path">{location.pathname}</div>
+    }
+
+    const saturdayProject: Project = {
+      ...makeProject(),
+      stages: [
+        {
+          id: 'stage-1',
+          name: 'Main Stage',
+          stageType: 'sequential',
+          activeDays: ['Saturday'],
+          schedule: {
+            Saturday: [{ startTime: '20:00', endTime: '22:00', eventType: 'timed' }],
+          },
+          slotDuration: 60,
+        },
+      ],
+    }
+
+    render(
+      <AppPreferencesContext.Provider
+        value={{
+          timeFormat: '24h',
+          setTimeFormat: () => undefined,
+          hiddenNames: false,
+          setHiddenNames: () => undefined,
+        }}
+      >
+        <ProjectContext.Provider
+          value={{
+            project: saturdayProject,
+            setProject: () => undefined,
+            submissions: [makeSubmission('S001', 'DJ Alpha')],
+            setSubmissions: () => undefined,
+            rowCountMismatch: false,
+            setRowCountMismatch: () => undefined,
+            toggleDiscardSubmission: () => undefined,
+            setAcceptanceStatus: () => undefined,
+            replaceWithDeclineHistory: () => undefined,
+          }}
+        >
+          <MemoryRouter initialEntries={['/project/project-1/lineup/thursday']}>
+            <Routes>
+              <Route path="/project/:id/lineup/:day" element={<><PathProbe /><LineupView /></>} />
+            </Routes>
+          </MemoryRouter>
+        </ProjectContext.Provider>
+      </AppPreferencesContext.Provider>
+    )
+
+    expect(screen.getByTestId('path').textContent).toBe('/project/project-1/lineup/saturday')
   })
 })

@@ -5,8 +5,53 @@ export function getStageEventType(event: { eventType?: 'timed' | 'special' }): '
   return event.eventType ?? 'timed'
 }
 
+function normalizeDayKey(day: string): string {
+  return day.trim().toLowerCase()
+}
+
+/**
+ * Returns schedule events for a day, tolerant of case/whitespace mismatches in stored keys.
+ */
+export function getScheduleEventsForDay(
+  schedule: Record<string, { eventType?: 'timed' | 'special'; startTime?: string; endTime?: string; label?: string }[]> | undefined,
+  day: string
+): { eventType?: 'timed' | 'special'; startTime?: string; endTime?: string; label?: string }[] {
+  if (!schedule) return []
+
+  const direct = schedule[day]
+  if (direct) return direct
+
+  const target = normalizeDayKey(day)
+  for (const [key, events] of Object.entries(schedule)) {
+    if (normalizeDayKey(key) === target) {
+      return events
+    }
+  }
+  return []
+}
+
 /** Convention days in display order. */
 export const CONVENTION_DAYS = ['Thursday', 'Friday', 'Saturday', 'Sunday'] as const
+
+export function getProjectDayNames(startDate?: string, endDate?: string): string[] {
+  if (!startDate || !endDate) return []
+
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return []
+  }
+
+  const names: string[] = []
+  const current = new Date(start)
+  while (current <= end) {
+    names.push(current.toLocaleDateString('en-US', { weekday: 'long' }))
+    current.setDate(current.getDate() + 1)
+  }
+
+  return names
+}
 
 export function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
@@ -38,6 +83,14 @@ function toSortableMinutes(m: number): number {
   return m < 360 ? m + 24 * 60 : m
 }
 
+function normalizeEventRange(startMinutes: number, endMinutes: number): { startMinutes: number; endMinutes: number } {
+  let nextEnd = endMinutes
+  if (nextEnd <= startMinutes) {
+    nextEnd += 24 * 60
+  }
+  return { startMinutes, endMinutes: nextEnd }
+}
+
 /**
  * Returns an array of "HH:MM" slot start-time labels for a specific event on a stage on a given evening.
  * Handles events that cross midnight (endTime < startTime).
@@ -47,24 +100,20 @@ export function getSlotLabels(stage: Stage, evening: string, eventIndex = 0): st
   // Simultaneous stages have no slot rows — all DJs play the full event window.
   if (stage.stageType === 'simultaneous') return []
 
-  const events = stage.schedule?.[evening]
+  const events = getScheduleEventsForDay(stage.schedule, evening)
   if (!events || events.length === 0) return []
   const daySchedule = events[eventIndex]
   if (!daySchedule || getStageEventType(daySchedule) === 'special') return []
-  if (!daySchedule.startTime || !daySchedule.endTime || !stage.slotDuration) return []
+  const slotDuration = typeof stage.slotDuration === 'number'
+    ? stage.slotDuration
+    : Number(stage.slotDuration)
+  if (!daySchedule.startTime || !daySchedule.endTime || !Number.isFinite(slotDuration) || slotDuration <= 0) return []
 
   const startMinutes = timeToMinutes(daySchedule.startTime)
-  let endMinutes = timeToMinutes(daySchedule.endTime)
-
-  // Cross-midnight: if end is at or before start, add 24 hours
-  if (endMinutes <= startMinutes) {
-    endMinutes += 24 * 60
-  }
-
-  if (stage.slotDuration <= 0) return []
+  const { endMinutes } = normalizeEventRange(startMinutes, timeToMinutes(daySchedule.endTime))
 
   const labels: string[] = []
-  for (let t = startMinutes; t + stage.slotDuration <= endMinutes; t += stage.slotDuration) {
+  for (let t = startMinutes; t + slotDuration <= endMinutes; t += slotDuration) {
     labels.push(minutesToTime(t))
   }
   return labels
@@ -88,60 +137,40 @@ export function getEventLabel(event: { label?: string }, index: number): string 
  * Times before 06:00 are treated as "next day" for sort order.
  */
 export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
-  const sequentialStages = stages.filter(
-    (s) => s.stageType !== 'simultaneous' && (s.activeDays ?? []).includes(evening)
-  )
-  if (sequentialStages.length === 0) return []
+  const activeStages = stages.filter((s) => (s.activeDays ?? []).includes(evening))
+  if (activeStages.length === 0) return []
 
   let earliestStart = Infinity
   let latestEnd = -Infinity
   let minDuration = Infinity
 
-  for (const stage of sequentialStages) {
-    const events = stage.schedule?.[evening]
-    if (!events || events.length === 0 || !stage.slotDuration) continue
+  for (const stage of activeStages) {
+    const events = getScheduleEventsForDay(stage.schedule, evening)
+    if (!events || events.length === 0) continue
 
     for (const event of events) {
       if (getStageEventType(event) === 'special') continue
       if (!event.startTime || !event.endTime) continue
 
       const startM = timeToMinutes(event.startTime)
-      let endM = timeToMinutes(event.endTime)
-      if (endM <= startM) endM += 24 * 60
+      const { endMinutes: endM } = normalizeEventRange(startM, timeToMinutes(event.endTime))
 
       const startSortable = toSortableMinutes(startM)
       const endSortable = startSortable + (endM - startM)
 
       if (startSortable < earliestStart) earliestStart = startSortable
       if (endSortable > latestEnd) latestEnd = endSortable
-      if (stage.slotDuration < minDuration) minDuration = stage.slotDuration
+      const stageSlotDuration = typeof stage.slotDuration === 'number'
+        ? stage.slotDuration
+        : Number(stage.slotDuration)
+      if (stage.stageType !== 'simultaneous' && Number.isFinite(stageSlotDuration) && stageSlotDuration > 0 && stageSlotDuration < minDuration) {
+        minDuration = stageSlotDuration
+      }
     }
   }
 
-  // Expand axis bounds to cover simultaneous stages so getSimultaneousRowRange can map
-  // their start/end times onto the correct grid rows even when they fall outside the
-  // sequential stage range (e.g. a silent disco running 1pm–3pm before DJs start at 3pm).
-  for (const stage of stages) {
-    if (stage.stageType !== 'simultaneous' || !(stage.activeDays ?? []).includes(evening)) continue
-    const events = stage.schedule?.[evening]
-    if (!events || events.length === 0) continue
-    // Simultaneous stages only use the first event for time-axis bounds
-    const event = events[0]
-    if (event && getStageEventType(event) === 'special') continue
-    if (!event?.startTime || !event?.endTime) continue
-
-    const startM = timeToMinutes(event.startTime)
-    let endM = timeToMinutes(event.endTime)
-    if (endM <= startM) endM += 24 * 60
-
-    const startSortable = toSortableMinutes(startM)
-    const endSortable = startSortable + (endM - startM)
-
-    if (startSortable < earliestStart) earliestStart = startSortable
-    if (endSortable > latestEnd) latestEnd = endSortable
-  }
-
-  if (!isFinite(earliestStart) || !isFinite(latestEnd) || !isFinite(minDuration)) return []
+  if (!isFinite(earliestStart) || !isFinite(latestEnd)) return []
+  if (!isFinite(minDuration)) minDuration = 60
 
   const labels: string[] = []
   for (let t = earliestStart; t < latestEnd; t += minDuration) {
@@ -149,7 +178,21 @@ export function getEveningTimeAxis(stages: Stage[], evening: string): string[] {
     const actualMinutes = t >= 24 * 60 ? t - 24 * 60 : t
     labels.push(minutesToTime(actualMinutes))
   }
-  return labels
+
+  // Include all real sequential slot starts so stages with offset starts
+  // (e.g. 12:15 with 90-minute slots) are always represented on the axis.
+  const allLabels = new Set(labels)
+  for (const stage of activeStages) {
+    if (stage.stageType === 'simultaneous') continue
+    const events = getScheduleEventsForDay(stage.schedule, evening)
+    for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
+      for (const slotLabel of getSlotLabels(stage, evening, eventIndex)) {
+        allLabels.add(slotLabel)
+      }
+    }
+  }
+
+  return [...allLabels].sort((a, b) => toSortableMinutes(timeToMinutes(a)) - toSortableMinutes(timeToMinutes(b)))
 }
 
 /**
@@ -162,7 +205,7 @@ export function getStageEventSlots(
   evening: string
 ): { timeLabel: string; eventIndex: number; slotIndex: number }[] {
   if (stage.stageType === 'simultaneous') return []
-  const events = stage.schedule?.[evening] ?? []
+  const events = getScheduleEventsForDay(stage.schedule, evening)
   const result: { timeLabel: string; eventIndex: number; slotIndex: number }[] = []
   for (let ei = 0; ei < events.length; ei++) {
     const labels = getSlotLabels(stage, evening, ei)
@@ -213,12 +256,14 @@ export function getSimultaneousRowRange(
   if (timeAxis.length === 0) return { gridRowStart: 2, gridRowEnd: 3 }
 
   const fullSpan = { gridRowStart: 2, gridRowEnd: 2 + timeAxis.length }
-  const events = stage.schedule?.[evening]
+  const events = getScheduleEventsForDay(stage.schedule, evening)
   const event = events?.[eventIndex]
   if (!event?.startTime || !event?.endTime) return fullSpan
 
-  const startM = toSortableMinutes(timeToMinutes(event.startTime))
-  const endM = toSortableMinutes(timeToMinutes(event.endTime))
+  const startMinutes = timeToMinutes(event.startTime)
+  const { endMinutes } = normalizeEventRange(startMinutes, timeToMinutes(event.endTime))
+  const startM = toSortableMinutes(startMinutes)
+  const endM = toSortableMinutes(endMinutes)
 
   // First row whose time >= stage start (inclusive lower bound)
   let startRowIdx = timeAxis.findIndex((t) => toSortableMinutes(timeToMinutes(t)) >= startM)
