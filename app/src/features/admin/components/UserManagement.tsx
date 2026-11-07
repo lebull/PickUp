@@ -56,7 +56,7 @@ export function UserManagement() {
       <main className="app-main">
         <form className="project-create-form" onSubmit={handleSubmit}>
           <p className="empty-state-message user-mgmt-note">
-            Manage coordinator access by Firebase Auth UID, email, or username. Email grants now work before first sign-in and are applied automatically when that user logs in.
+            Manage coordinator access by Firebase Auth UID, email, or username. Users must sign in to the app once so their profile is created.
           </p>
 
           <div className="form-field">
@@ -89,7 +89,7 @@ export function UserManagement() {
 
           {result && (
             <div className="user-mgmt-result">
-              <p><strong>Updated target:</strong> {result.uid}</p>
+              <p><strong>Updated user:</strong> {result.uid}</p>
               <p><strong>Coordinator:</strong> {result.coordinator ? 'yes' : 'no'}</p>
             </div>
           )}

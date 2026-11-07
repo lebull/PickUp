@@ -6,7 +6,7 @@ import {
   signOut,
   type User,
 } from 'firebase/auth'
-import { deleteDoc, doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { auth } from '../../../firebase.ts'
 import { db } from '../../../firebase.ts'
 import { hasCoordinatorRole } from '../../../authz.ts'
@@ -28,25 +28,6 @@ async function syncUserProfile(user: User): Promise<void> {
     usernameLower: username.toLowerCase(),
     lastSeenAt: new Date().toISOString(),
   }, { merge: true })
-}
-
-async function claimPendingCoordinatorGrant(user: User): Promise<void> {
-  const email = user.email?.trim().toLowerCase()
-  if (!email) return
-
-  const grantRef = doc(db, 'roleGrants', email)
-  const grantSnap = await getDoc(grantRef)
-  if (!grantSnap.exists()) return
-
-  const data = grantSnap.data() as { coordinator?: unknown }
-  if (data.coordinator !== true) return
-
-  await setDoc(doc(db, 'users', user.uid), {
-    roles: { coordinator: true },
-    updatedAt: new Date().toISOString(),
-  }, { merge: true })
-
-  await deleteDoc(grantRef)
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -77,10 +58,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
       void syncUserProfile(u).catch(() => {
         // Best-effort profile sync; authorization is still determined from roles.
-      })
-
-      void claimPendingCoordinatorGrant(u).catch(() => {
-        // Best-effort claim for pre-authorized email grants.
       })
 
       unsubscribeUserDoc = onSnapshot(doc(db, 'users', u.uid), (snap) => {
