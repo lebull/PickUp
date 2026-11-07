@@ -5,7 +5,7 @@ import {
   AppPreferencesContext,
   useAppPreferences,
   useAppPreferencesState,
-} from '../AppPreferencesContext'
+} from '../shared/context/AppPreferencesContext'
 
 describe('AppPreferencesContext', () => {
   it('throws when useAppPreferences is called outside provider', () => {

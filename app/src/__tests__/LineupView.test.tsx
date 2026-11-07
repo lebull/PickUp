@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { LineupView } from '../components/LineupView'
-import { ProjectContext, type ProjectContextValue } from '../ProjectContext'
-import { AppPreferencesContext } from '../AppPreferencesContext'
+import { LineupView } from '../features/lineup/components/LineupView'
+import { ProjectContext, type ProjectContextValue } from '../shared/context/ProjectContext'
+import { AppPreferencesContext } from '../shared/context/AppPreferencesContext'
 import type { Project, Submission } from '../types'
 
 function makeSubmission(id: string, name: string, overrides: Partial<Submission> = {}): Submission {

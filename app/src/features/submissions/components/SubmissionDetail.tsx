@@ -1,9 +1,9 @@
 import { useRef, useState, useEffect } from 'react'
-import type { Submission } from '../types.ts'
-import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { useProjectContext } from '../ProjectContext.ts'
-import { getSubmissionDeclinedNotice } from '../declinedContext.ts'
-import { getSubmissionConverter } from '../submissionConverters.ts'
+import type { Submission } from '../../../types.ts'
+import { useAppPreferences } from '../../../shared/context/AppPreferencesContext.ts'
+import { useProjectContext } from '../../../shared/context/ProjectContext.ts'
+import { getSubmissionDeclinedNotice } from '../../../declinedContext.ts'
+import { getSubmissionConverter } from '../../../submissionConverters.ts'
 
 function val(s: string | null | undefined): string {
   return s?.trim() || '—'

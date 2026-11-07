@@ -7,9 +7,9 @@ import {
   type User,
 } from 'firebase/auth'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
-import { auth } from '../firebase.ts'
-import { db } from '../firebase.ts'
-import { hasCoordinatorRole } from '../authz.ts'
+import { auth } from '../../../firebase.ts'
+import { db } from '../../../firebase.ts'
+import { hasCoordinatorRole } from '../../../authz.ts'
 
 function getDefaultUsername(user: User): string {
   if (user.displayName && user.displayName.trim()) return user.displayName.trim()

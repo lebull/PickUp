@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { useProjectContext } from '../ProjectContext.ts'
-import type { Submission, BlankSlotAssignment, Stage, SlotAssignment, DJSlotAssignment, SlotCoord } from '../types.ts'
-import { isBlankAssignment, getBlankLabel, isSlotAssignment, isSimultaneousCoord } from '../types.ts'
-import { SplitPane } from './SplitPane.tsx'
-import { SubmissionDetail } from './SubmissionDetail.tsx'
-import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { getEventLabel, getSlotLabels, getStageEventType, formatTimeLabel } from '../lineupUtils.ts'
-import { DJSelectionPanel } from './DJSelectionPanel.tsx'
-import type { ActiveSlot } from './DJSelectionPanel.tsx'
-import { getAssignmentDisplayContext } from '../declinedContext.ts'
+import { useProjectContext } from '../../../shared/context/ProjectContext.ts'
+import type { Submission, BlankSlotAssignment, Stage, SlotAssignment, DJSlotAssignment, SlotCoord } from '../../../types.ts'
+import { isBlankAssignment, getBlankLabel, isSlotAssignment, isSimultaneousCoord } from '../../../types.ts'
+import { SplitPane } from '../../../shared/components/SplitPane.tsx'
+import { SubmissionDetail } from '../../submissions/components/SubmissionDetail.tsx'
+import { useAppPreferences } from '../../../shared/context/AppPreferencesContext.ts'
+import { getEventLabel, getSlotLabels, getStageEventType, formatTimeLabel } from '../../../lineupUtils.ts'
+import { DJSelectionPanel } from '../../lineup/components/DJSelectionPanel.tsx'
+import type { ActiveSlot } from '../../lineup/components/DJSelectionPanel.tsx'
+import { getAssignmentDisplayContext } from '../../../declinedContext.ts'
 
 // ── Data helpers ─────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ function getRowEvening(row: ResultRow): string {
 
 function buildResultsData(
   submissions: Submission[],
-  project: import('../types.ts').Project
+  project: import('../../../types.ts').Project
 ) {
   const { assignments, stages, discardedSubmissions } = project
   const discardedSet = new Set(discardedSubmissions ?? [])
@@ -272,7 +272,7 @@ function DJRowItem({ row, displayName, isSelected, onClick, acceptanceStatus, on
   const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard
 
   return (
-    <button
+    <div
       className={`results-dj-row${isSelected ? ' selected' : ''}${acceptanceStatus === 'yes' ? ' results-dj-row--accepted' : ''}${acceptanceStatus === 'no' ? ' results-dj-row--declined' : ''}${isReplacementActive ? ' results-dj-row--picker-active' : ''}`}
       onClick={() => {
         if (acceptanceStatus === 'no' && onReplacementClick) {
@@ -281,7 +281,18 @@ function DJRowItem({ row, displayName, isSelected, onClick, acceptanceStatus, on
           onClick(s, row.assignment)
         }
       }}
-      type="button"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          if (acceptanceStatus === 'no' && onReplacementClick) {
+            onReplacementClick()
+          } else {
+            onClick(s, row.assignment)
+          }
+        }
+      }}
+      role="button"
+      tabIndex={0}
     >
       <span className="results-dj-name">{displayName}</span>
       <span className="results-dj-contact">
@@ -337,7 +348,7 @@ function DJRowItem({ row, displayName, isSelected, onClick, acceptanceStatus, on
           </button>
         </span>
       )}
-    </button>
+    </div>
   )
 }
 

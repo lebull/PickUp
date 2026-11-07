@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
-import { SET_LENGTH_OPTIONS, type SetLength, type Stage, type StageSchedule, type SlotAssignment } from '../types.ts'
-import { getProjectDayNames, getSlotLabels, getEventLabel, eventsOverlap, getStageEventType } from '../lineupUtils.ts'
-import { STAGE_COLOR_PALETTE } from '../stageColors.ts'
+import { SET_LENGTH_OPTIONS, type SetLength, type Stage, type StageSchedule, type SlotAssignment } from '../../../types.ts'
+import { getProjectDayNames, getSlotLabels, getEventLabel, eventsOverlap, getStageEventType } from '../../../lineupUtils.ts'
+import { STAGE_COLOR_PALETTE } from '../../../stageColors.ts'
 
 interface Props {
   stages: Stage[]

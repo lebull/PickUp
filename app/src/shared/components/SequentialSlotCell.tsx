@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { SlotCoord } from '../types.ts'
+import type { SlotCoord } from '../../types.ts'
 
 interface SequentialSlotCellProps {
   slotKey: string
@@ -57,8 +57,9 @@ export function SequentialSlotCell({
     : 'grid-cell grid-slot grid-slot--empty'
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={`${baseClass}${isActive ? ' grid-slot--active' : ''}${isDragOver ? ' grid-slot--drag-over' : ''}${isUnavailable ? ' grid-slot--availability-error' : ''}`}
       style={style}
       title={isUnavailable ? unavailableTitle : undefined}
@@ -95,24 +96,39 @@ export function SequentialSlotCell({
       }}
       onMouseEnter={onPeekEnter ? (e) => onPeekEnter(e.currentTarget.getBoundingClientRect()) : undefined}
       onMouseLeave={onPeekLeave}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSlotClick()
+        }
+      }}
       onClick={onSlotClick}
     >
       {isAssigned ? assignedLabel : '+'}
       {isOccupied && genre && <span className="slot-genre">{genre}</span>}
       {isOccupied && onRemove && (
-        <button
-          type="button"
+        <span
           className="slot-remove-btn"
+          role="button"
+          tabIndex={0}
           title="Remove DJ"
           onClick={(e) => {
             e.stopPropagation()
             onPeekLeave?.()
             onRemove()
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              e.stopPropagation()
+              onPeekLeave?.()
+              onRemove()
+            }
+          }}
         >
           ×
-        </button>
+        </span>
       )}
-    </button>
+    </div>
   )
 }

@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { createRef } from 'react'
 import type { Project, Stage, Submission, SlotAssignment } from '../types'
-import { SubmissionList } from '../components/SubmissionList'
-import { SubmissionDetail } from '../components/SubmissionDetail'
-import { ProjectContext } from '../ProjectContext'
-import { AppPreferencesContext } from '../AppPreferencesContext'
+import { SubmissionList } from '../features/submissions/components/SubmissionList'
+import { SubmissionDetail } from '../features/submissions/components/SubmissionDetail'
+import { ProjectContext } from '../shared/context/ProjectContext'
+import { AppPreferencesContext } from '../shared/context/AppPreferencesContext'
 
 function makeSubmission(id: string, name: string): Submission {
   return {

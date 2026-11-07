@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Submission, Stage, SlotAssignment, DJSlotAssignment } from '../types.ts'
-import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { hexToTint } from '../stageColors.ts'
-import { getSlotLabels, formatTimeLabel, getEventLabel, getStageEventType } from '../lineupUtils.ts'
-import { isDJUnavailableOnEvening } from '../djAvailability.ts'
-import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
+import type { Submission, Stage, SlotAssignment, DJSlotAssignment } from '../../../types.ts'
+import { isBlankAssignment, getBlankLabel } from '../../../types.ts'
+import { useAppPreferences } from '../../../shared/context/AppPreferencesContext.ts'
+import { hexToTint } from '../../../stageColors.ts'
+import { getSlotLabels, formatTimeLabel, getEventLabel, getStageEventType } from '../../../lineupUtils.ts'
+import { isDJUnavailableOnEvening } from '../../../djAvailability.ts'
+import { buildPeekContent, hasAnyScore } from '../../../scorePeekUtils.tsx'
 
 export interface ActiveSlot {
   stageId: string

@@ -1,5 +1,5 @@
-import type { Submission, SlotAssignment, DJSlotAssignment } from '../types.ts'
-import { isBlankAssignment } from '../types.ts'
+import type { Submission, SlotAssignment, DJSlotAssignment } from '../../../types.ts'
+import { isBlankAssignment } from '../../../types.ts'
 
 interface Props {
   submissions: Submission[]

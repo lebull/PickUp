@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { StageConfigPanel } from '../components/StageConfigPanel'
+import { StageConfigPanel } from '../features/lineup/components/StageConfigPanel'
 import type { Stage } from '../types'
 
 function makeSequentialStage(): Stage {

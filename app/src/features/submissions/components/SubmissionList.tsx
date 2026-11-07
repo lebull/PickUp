@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import type { RefObject } from 'react'
-import type { Submission, Stage, SlotAssignment } from '../types.ts'
-import { hexToTint } from '../stageColors.ts'
+import type { Submission, Stage, SlotAssignment } from '../../../types.ts'
+import { hexToTint } from '../../../stageColors.ts'
 
 export type SortField = 'main' | 'ml' | 'number' | null
 export type SortDir = 'asc' | 'desc'

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { ProjectContext } from '../ProjectContext'
-import { ResultsList } from '../components/ResultsList'
-import { AppPreferencesContext } from '../AppPreferencesContext'
+import { ProjectContext } from '../shared/context/ProjectContext'
+import { ResultsList } from '../features/results/components/ResultsList'
+import { AppPreferencesContext } from '../shared/context/AppPreferencesContext'
 import type { Project, Stage, Submission } from '../types'
 
 function makeSubmission(id: string, name: string, overrides: Partial<Submission> = {}): Submission {
@@ -115,6 +115,20 @@ function renderResults(project: Project, submissions: Submission[], hiddenNames 
     </AppPreferencesContext.Provider>
   )
 }
+
+describe('ResultsList DOM semantics', () => {
+  it('does not render nested buttons inside the review row', () => {
+    const project = makeProject()
+    const submissions = [
+      makeSubmission('S001', 'DJ Accepted', { contactEmail: 'accepted@example.com' }),
+    ]
+
+    const { container } = renderResults(project, submissions)
+    const nestedButton = Array.from(container.querySelectorAll('button')).find((button) => button.querySelector('button'))
+
+    expect(nestedButton).toBeUndefined()
+  })
+})
 
 describe('ResultsList bulk email copy', () => {
   beforeEach(() => {
@@ -342,7 +356,7 @@ describe('ResultsList replacement picker', () => {
     }
     const submissions = [makeSubmission('S001', 'DJ Declined'), makeSubmission('S002', 'DJ Available')]
     renderResults(project, submissions)
-    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ Declined/i }))
     expect(screen.getByRole('button', { name: 'Close panel' })).toBeTruthy()
   })
 
@@ -356,10 +370,10 @@ describe('ResultsList replacement picker', () => {
     const submissions = [makeSubmission('S001', 'DJ Declined'), makeSubmission('S002', 'DJ Available')]
     renderResults(project, submissions)
     // First click: opens picker (layout changes from full-width to SplitPane)
-    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ Declined/i }))
     expect(screen.getByRole('button', { name: 'Close panel' })).toBeTruthy()
     // Second click: re-query after DOM reorganization, then close
-    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ Declined/i }))
     expect(screen.queryByRole('button', { name: 'Close panel' })).toBeNull()
   })
 
@@ -373,7 +387,7 @@ describe('ResultsList replacement picker', () => {
     }
     const submissions = [makeSubmission('S001', 'DJ Declined'), makeSubmission('S002', 'DJ Available')]
     renderResults(project, submissions, false, { replaceWithDeclineHistory })
-    fireEvent.click(screen.getByText('DJ Declined').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ Declined/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Assign DJ Available' }))
     expect(replaceWithDeclineHistory).toHaveBeenCalledWith(
       expect.objectContaining({ stageId: 'stage-1', evening: 'Friday' }),
@@ -394,7 +408,7 @@ describe('ResultsList replacement picker', () => {
       makeSubmission('S003', 'DJ Available'),
     ]
     renderResults(project, submissions)
-    fireEvent.click(screen.getByText('DJ Current').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ Current/i }))
     const panel = document.querySelector('.dj-selection-panel')!
     expect(within(panel as HTMLElement).queryByText('DJ PriorDecline')).toBeNull()
     expect(within(panel as HTMLElement).queryByText('DJ Current')).toBeNull()
@@ -532,7 +546,7 @@ describe('ResultsList prior-decline status', () => {
     ]
 
     renderResults(project, submissions)
-    fireEvent.click(screen.getByText('DJ Current').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ Current/i }))
 
     const status = document.querySelector('.results-prior-decline-status') as HTMLElement
     expect(status).toBeTruthy()
@@ -564,7 +578,7 @@ describe('ResultsList prior-decline status', () => {
     ]
 
     renderResults(project, submissions, true)
-    fireEvent.click(screen.getByText('DJ #1').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ #1/i }))
 
     const status = document.querySelector('.results-prior-decline-status') as HTMLElement
     expect(status).toBeTruthy()
@@ -605,7 +619,7 @@ describe('ResultsList prior-decline status', () => {
     ]
 
     renderResults(project, submissions)
-    fireEvent.click(screen.getByText('DJ Current').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: /DJ Current/i }))
 
     const status = document.querySelector('.results-prior-decline-status') as HTMLElement
     expect(status).toBeTruthy()

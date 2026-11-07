@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
-import { LineupGrid } from '../components/LineupGrid'
-import { AppPreferencesContext } from '../AppPreferencesContext'
+import { LineupGrid } from '../features/lineup/components/LineupGrid'
+import { AppPreferencesContext } from '../shared/context/AppPreferencesContext'
 import type { Submission, Stage, SlotAssignment } from '../types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -113,6 +113,25 @@ function renderGrid(stages: Stage[], submissions: Submission[], assignments: Slo
 }
 
 // ── 5.3: Grid peek — sequential cells ─────────────────────────────────────────
+
+describe('LineupGrid — DOM semantics', () => {
+  it('does not render a remove button nested inside another button', () => {
+    const dj = makeSubmission('S001', 'DJ Alpha')
+    const assignment: SlotAssignment = {
+      type: 'dj',
+      stageId: 'stage1',
+      evening: 'Friday',
+      slotIndex: 0,
+      eventIndex: 0,
+      submissionNumber: 'S001',
+    }
+
+    const { container } = renderGrid([sequentialStage], [dj], [assignment])
+    const nestedButton = Array.from(container.querySelectorAll('button')).find((button) => button.querySelector('button'))
+
+    expect(nestedButton).toBeUndefined()
+  })
+})
 
 describe('LineupGrid — score peek on sequential cells', () => {
   it('shows peek tooltip when hovering an occupied cell with scores', async () => {

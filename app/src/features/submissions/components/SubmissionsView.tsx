@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useProjectContext } from '../ProjectContext.ts'
+import { useProjectContext } from '../../../shared/context/ProjectContext.ts'
 import { SubmissionList } from './SubmissionList.tsx'
 import type { SortField, SortDir, ScoreMetric } from './SubmissionList.tsx'
 import { SubmissionDetail } from './SubmissionDetail.tsx'
-import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { SplitPane } from './SplitPane.tsx'
-import { isSlotAssignment } from '../types.ts'
-import { getSubmissionConverter } from '../submissionConverters.ts'
+import { useAppPreferences } from '../../../shared/context/AppPreferencesContext.ts'
+import { SplitPane } from '../../../shared/components/SplitPane.tsx'
+import { isSlotAssignment } from '../../../types.ts'
+import { getSubmissionConverter } from '../../../submissionConverters.ts'
 function SubmissionDetailRoute() {
   const { djIndex } = useParams<{ djIndex: string }>()
   const { submissions } = useProjectContext()

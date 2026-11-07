@@ -1,4 +1,4 @@
-import type { TimeFormat } from './AppPreferencesContext.ts'
+import type { TimeFormat } from './shared/context/AppPreferencesContext.ts'
 import { formatTimeLabel, getEventLabel, getSlotLabels } from './lineupUtils.ts'
 import type { DJSlotAssignment, Project, Stage } from './types.ts'
 import { isSlotAssignment } from './types.ts'

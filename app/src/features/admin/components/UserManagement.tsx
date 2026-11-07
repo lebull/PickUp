@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { setUserCoordinator } from '../userRolesStore.ts'
+import { setUserCoordinator } from '../../../userRolesStore.ts'
 
 type Mode = 'grant' | 'revoke'
 

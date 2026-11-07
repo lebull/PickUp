@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createProject } from '../projectStore'
+import { createProject } from '../../../projectStore'
 
 export function ProjectCreate() {
   const navigate = useNavigate()

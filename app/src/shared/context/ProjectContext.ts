@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { Project, Submission, SlotCoord } from './types.ts'
+import type { Project, Submission, SlotCoord } from '../../types.ts'
 
 export interface ProjectContextValue {
   project: Project

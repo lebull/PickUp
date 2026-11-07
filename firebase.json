@@ -4,11 +4,26 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "public": "public",
+    "public": "app/dist",
+    "predeploy": [
+      "npm --prefix app run build"
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "/PickUp",
+        "destination": "/",
+        "type": 302
+      },
+      {
+        "source": "/PickUp/**",
+        "destination": "/",
+        "type": 302
+      }
     ],
     "rewrites": [
       {

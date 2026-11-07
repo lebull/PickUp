@@ -11,6 +11,7 @@
         ".specify/scripts/powershell/": true,
         "Test-Path": true
     },
-    "deno.enable": true
+    // "deno.enable": true,
+    "typescript.tsserver.experimental.enableProjectDiagnostics": false
 }
 

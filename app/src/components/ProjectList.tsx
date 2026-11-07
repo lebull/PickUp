@@ -13,10 +13,27 @@ export function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    listProjects().then(setProjects)
+    let cancelled = false
+
+    listProjects()
+      .then((nextProjects) => {
+        if (!cancelled) setProjects(nextProjects)
+      })
+      .catch((error) => {
+        console.error('Failed to load projects.', error)
+        if (!cancelled) {
+          setProjects([])
+          setLoadError('Could not load projects. Make sure you are signed in with a coordinator account for this Firebase project.')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function handleDelete(id: string) {
@@ -76,6 +93,7 @@ export function ProjectList() {
 
       <main className="app-main">
         {importError && <p className="import-error">{importError}</p>}
+        {loadError && <p className="import-error">{loadError}</p>}
 
         {projects.length === 0 ? (
           <div className="empty-state">

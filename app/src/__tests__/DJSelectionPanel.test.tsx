@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
-import { DJSelectionPanel, type ActiveSlot } from '../components/DJSelectionPanel'
-import { AppPreferencesContext } from '../AppPreferencesContext'
+import { DJSelectionPanel, type ActiveSlot } from '../features/lineup/components/DJSelectionPanel'
+import { AppPreferencesContext } from '../shared/context/AppPreferencesContext'
 import type { Submission, SlotAssignment, Stage } from '../types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

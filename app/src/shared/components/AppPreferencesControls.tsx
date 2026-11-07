@@ -1,4 +1,4 @@
-import { useAppPreferences } from '../AppPreferencesContext.ts'
+import { useAppPreferences } from '../context/AppPreferencesContext.ts'
 
 export function AppPreferencesControls() {
   const { timeFormat, setTimeFormat, hiddenNames, setHiddenNames } = useAppPreferences()

@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react'
-import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
-import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { formatTimeLabel, timeToMinutes, getStageEventType, getProjectDayNames, getScheduleEventsForDay, getStageEventSlots } from '../lineupUtils.ts'
-import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { hexToTint } from '../stageColors.ts'
+import { Fragment, useMemo, useState } from 'react'
+import type { Submission, Stage, SlotAssignment, SlotCoord } from '../../../types.ts'
+import { isBlankAssignment, getBlankLabel } from '../../../types.ts'
+import { formatTimeLabel, timeToMinutes, getStageEventType, getProjectDayNames, getScheduleEventsForDay, getStageEventSlots } from '../../../lineupUtils.ts'
+import { useAppPreferences } from '../../../shared/context/AppPreferencesContext.ts'
+import { hexToTint } from '../../../stageColors.ts'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
-import { SequentialSlotCell } from './SequentialSlotCell.tsx'
-import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
+import { SequentialSlotCell } from '../../../shared/components/SequentialSlotCell.tsx'
+import { buildPeekContent, hasAnyScore } from '../../../scorePeekUtils.tsx'
 
 interface Props {
   submissions: Submission[]
@@ -215,8 +215,8 @@ export function StageGrid({
             ? formatTimeLabel(firstEvent.startTime, timeFormat)
             : `Set ${ei + 1}`
           return (
-            <>
-              <div key={`sim-time-${ei}`} className="grid-cell grid-time-label">{rowLabel}</div>
+            <Fragment key={`sim-row-${ei}`}>
+              <div className="grid-cell grid-time-label">{rowLabel}</div>
               {activeDays.map((day) => {
                 const dayEvents = getTimedEvents(day)
                 if (ei >= dayEvents.length && dayEvents.length > 0) {
@@ -315,24 +315,24 @@ export function StageGrid({
                   </div>
                 )
               })}
-            </>
+            </Fragment>
           )
         })
         : slotRows.length === 0 ? (
           // No slot times configured
-          <>
+          <Fragment key="unconf-row">
             <div className="grid-cell grid-time-label">—</div>
             {activeDays.map((day) => (
               <div key={`unconf-${day}`} className="grid-cell grid-slot grid-slot--unconfigured">
                 <span className="slot-config-hint">Set times for {day}</span>
               </div>
             ))}
-          </>
+          </Fragment>
         ) : (
           // Sequential: one row per time slot
           slotRows.map((label) => (
-            <>
-              <div key={`time-${label}`} className="grid-cell grid-time-label">
+            <Fragment key={`time-row-${label}`}>
+              <div className="grid-cell grid-time-label">
                 {formatTimeLabel(label, timeFormat)}
               </div>
               {activeDays.map((day) => {
@@ -395,7 +395,7 @@ export function StageGrid({
                   />
                 )
               })}
-            </>
+            </Fragment>
           ))
         )}
       </div>

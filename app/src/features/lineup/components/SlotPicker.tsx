@@ -1,4 +1,4 @@
-import type { Submission, Stage, SlotAssignment } from '../types.ts'
+import type { Submission, Stage, SlotAssignment } from '../../../types.ts'
 
 interface Props {
   submissions: Submission[]

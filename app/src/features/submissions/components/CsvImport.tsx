@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { parseSubmissions } from '../loadSubmissions.ts'
-import type { Submission } from '../types.ts'
-import { listSubmissionConverters } from '../submissionConverters.ts'
+import { parseSubmissions } from '../../../loadSubmissions.ts'
+import type { Submission } from '../../../types.ts'
+import { listSubmissionConverters } from '../../../submissionConverters.ts'
 
 interface Props {
   onImport: (

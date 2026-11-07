@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { Submission, Stage, SlotAssignment, SlotCoord } from '../types.ts'
-import { isBlankAssignment, getBlankLabel } from '../types.ts'
-import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventType, getProjectDayNames, getScheduleEventsForDay, timeToMinutes } from '../lineupUtils.ts'
-import { useAppPreferences } from '../AppPreferencesContext.ts'
-import { getReadableTextColor, hexToTint } from '../stageColors.ts'
-import { buildPeekContent, hasAnyScore } from '../scorePeekUtils.tsx'
-import { SequentialSlotCell } from './SequentialSlotCell.tsx'
+import type { Submission, Stage, SlotAssignment, SlotCoord } from '../../../types.ts'
+import { isBlankAssignment, getBlankLabel } from '../../../types.ts'
+import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeLabel, getStageEventType, getProjectDayNames, getScheduleEventsForDay, timeToMinutes } from '../../../lineupUtils.ts'
+import { useAppPreferences } from '../../../shared/context/AppPreferencesContext.ts'
+import { getReadableTextColor, hexToTint } from '../../../stageColors.ts'
+import { buildPeekContent, hasAnyScore } from '../../../scorePeekUtils.tsx'
+import { SequentialSlotCell } from '../../../shared/components/SequentialSlotCell.tsx'
 
 interface SequentialSlotSpan {
   eventIndex: number
@@ -360,8 +360,8 @@ export function LineupGrid({
                 .map((s) => Math.max(getTimedEvents(s, evening).length, 1))
             )
             return Array.from({ length: maxEvents }, (_, evtIdx) => (
-              <>
-                <div key={`time-noaxis-${evtIdx}`} className="grid-cell grid-time-label">—</div>
+              <Fragment key={`time-noaxis-${evtIdx}`}>
+                <div className="grid-cell grid-time-label">—</div>
                 {stageColumns.map(({ stage }, colIdx) => {
                   if (stage.stageType !== 'simultaneous') {
                     return evtIdx === 0 ? (
@@ -411,7 +411,7 @@ export function LineupGrid({
                     />
                   )
                 })}
-              </>
+              </Fragment>
             ))
           })()}
 
@@ -432,8 +432,8 @@ export function LineupGrid({
             timeAxis.map((timeLabel, rowIndex) => {
               const cellRow = rowIndex + 2 // header = row 1, first data row = row 2
               return (
-                <>
-                  <div key={`time-${timeLabel}`} className="grid-cell grid-time-label">
+                <Fragment key={`time-row-${timeLabel}-${rowIndex}`}>
+                  <div className="grid-cell grid-time-label">
                     {formatTimeLabel(timeLabel, timeFormat)}
                   </div>
                   {stageColumns.map(({ stage }, colIdx) => {
@@ -581,7 +581,7 @@ export function LineupGrid({
                       />
                     )
                   })}
-                </>
+                </Fragment>
               )
             })}
         </div>

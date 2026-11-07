@@ -1,6 +1,6 @@
 import { coerceSetLength } from './types.ts'
 import type { Stage } from './types.ts'
-import type { TimeFormat } from './AppPreferencesContext.ts'
+import type { TimeFormat } from './shared/context/AppPreferencesContext.ts'
 
 export function getStageEventType(event: { eventType?: 'timed' | 'special' }): 'timed' | 'special' {
   return event.eventType ?? 'timed'

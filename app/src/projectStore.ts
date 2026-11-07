@@ -137,15 +137,23 @@ export async function listProjects(): Promise<Project[]> {
   const sharedById = new Map(sharedProjects.map((p) => [p.id, p] as const))
 
   // Legacy fallback: include/migrate the current user's historical projects.
-  const legacySnap = await getDocs(legacyProjectsCol())
-  const legacyProjects = legacySnap.docs
-    .map((d) => d.data() as Project)
-    .map(normalizeProject)
+  // This must be skipped when no user is signed in; otherwise the auth-only
+  // legacy path throws and the app silently shows an empty project list.
+  if (auth.currentUser) {
+    try {
+      const legacySnap = await getDocs(legacyProjectsCol())
+      const legacyProjects = legacySnap.docs
+        .map((d) => d.data() as Project)
+        .map(normalizeProject)
 
-  for (const project of legacyProjects) {
-    if (sharedById.has(project.id)) continue
-    sharedById.set(project.id, project)
-    await setDoc(doc(sharedProjectsCol(), project.id), project)
+      for (const project of legacyProjects) {
+        if (sharedById.has(project.id)) continue
+        sharedById.set(project.id, project)
+        await setDoc(doc(sharedProjectsCol(), project.id), project)
+      }
+    } catch (error) {
+      console.warn('Unable to load legacy projects; proceeding with shared projects only.', error)
+    }
   }
 
   return Array.from(sharedById.values())
