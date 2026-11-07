@@ -6,6 +6,7 @@ import { hexToTint } from '../../../stageColors.ts'
 import { getSlotLabels, formatTimeLabel, getEventLabel, getStageEventType } from '../../../lineupUtils.ts'
 import { isDJUnavailableOnEvening } from '../../../djAvailability.ts'
 import { buildPeekContent, hasAnyScore } from '../../../scorePeekUtils.tsx'
+import { getPeekTooltipStyle } from '../../../shared/peekTooltipPosition.ts'
 
 export interface ActiveSlot {
   stageId: string
@@ -164,7 +165,7 @@ function SlotTray({
                       <>
                         <span
                           className="slot-tray-dj-score"
-                          title={fmt(scoreVal)}
+                          title={canPeek ? undefined : fmt(scoreVal)}
                           onMouseEnter={canPeek && sub ? (e) => { e.stopPropagation(); onPeekEnter(sub, e.currentTarget.getBoundingClientRect()) } : undefined}
                           onMouseLeave={canPeek ? () => onPeekLeave() : undefined}
                         >
@@ -227,7 +228,7 @@ function SlotTray({
                     <>
                       <span
                         className="slot-tray-dj-score"
-                        title={fmt(scoreVal)}
+                        title={canPeek ? undefined : fmt(scoreVal)}
                         onMouseEnter={canPeek && sub ? (e) => { e.stopPropagation(); onPeekEnter(sub, e.currentTarget.getBoundingClientRect()) } : undefined}
                         onMouseLeave={canPeek ? () => onPeekLeave() : undefined}
                       >
@@ -300,7 +301,7 @@ export function DJSelectionPanel({
     return [...seen].sort()
   }, [submissions])
 
-  const [scorePeek, setScorePeek] = useState<{ sub: Submission; rect: DOMRect } | null>(null)
+  const [scorePeek, setScorePeek] = useState<{ sub: Submission; rect: DOMRect; useMoonlight: boolean } | null>(null)
 
   // Reset focus stage and availability filter when stage/day context changes.
   const contextKey = `${activeSlot?.stageId ?? 'none'}|${effectiveEvening}`
@@ -422,7 +423,11 @@ export function DJSelectionPanel({
     const mainScoreVal = s.mainScore.avg
     const mlScoreVal = s.mlScore.avg
     const scoreVal = useMoonlight ? mlScoreVal : mainScoreVal
-    const hasPeek = hasAnyScore(s, useMoonlight)
+    const browsePeekUseMoonlight = isBrowsing
+      ? (hasAnyScore(s, false) ? false : (projectSupportsMoonlight && hasAnyScore(s, true) ? true : null))
+      : null
+    const canPeek = isBrowsing ? browsePeekUseMoonlight !== null : hasAnyScore(s, useMoonlight)
+    const peekUseMoonlight = isBrowsing ? (browsePeekUseMoonlight ?? false) : useMoonlight
     const isUnavailable = isDJUnavailableOnEvening(s.daysAvailable, effectiveEvening)
     return (
       <div
@@ -438,6 +443,8 @@ export function DJSelectionPanel({
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAssign(s.submissionNumber) }}
         aria-label={isBrowsing ? djLabel(s) : `Assign ${djLabel(s)}`}
+        onMouseEnter={canPeek ? (e) => { setScorePeek({ sub: s, rect: e.currentTarget.getBoundingClientRect(), useMoonlight: peekUseMoonlight }) } : undefined}
+        onMouseLeave={canPeek ? () => setScorePeek(null) : undefined}
       >
         <span className="dj-col-name" title={djLabel(s)}>
           {isUnavailable && (
@@ -451,18 +458,15 @@ export function DJSelectionPanel({
         </span>
         {isBrowsing ? (
           <>
-            <span className="dj-col-score" title={fmt(mainScoreVal)}>{fmt(mainScoreVal)}</span>
+            <span className="dj-col-score" title={canPeek ? undefined : fmt(mainScoreVal)}>{fmt(mainScoreVal)}</span>
             {projectSupportsMoonlight && (
-              <span className="dj-col-score dj-col-score--ml" title={fmt(mlScoreVal)}>{fmt(mlScoreVal)}</span>
+              <span className="dj-col-score dj-col-score--ml" title={canPeek ? undefined : fmt(mlScoreVal)}>{fmt(mlScoreVal)}</span>
             )}
           </>
         ) : (
           <span
             className="dj-col-score"
-            title={fmt(scoreVal)}
-            onMouseEnter={hasPeek ? (e) => { e.stopPropagation(); setScorePeek({ sub: s, rect: e.currentTarget.getBoundingClientRect() }) } : undefined}
-            onMouseLeave={hasPeek ? () => setScorePeek(null) : undefined}
-
+            title={canPeek ? undefined : fmt(scoreVal)}
           >
             {fmt(scoreVal)}
           </span>
@@ -558,7 +562,7 @@ export function DJSelectionPanel({
           onSelectPosition={onPositionSelect}
           onSelectSlot={onSelectSlot}
           useMoonlight={useMoonlight}
-          onPeekEnter={(sub, rect) => setScorePeek({ sub, rect })}
+          onPeekEnter={(sub, rect) => setScorePeek({ sub, rect, useMoonlight })}
           onPeekLeave={() => setScorePeek(null)}
           isSpecialEvent={isSpecialEvent}
         />
@@ -629,13 +633,9 @@ export function DJSelectionPanel({
       {scorePeek && (
         <div
           className="score-peek-tooltip"
-          style={{
-            position: 'fixed',
-            bottom: `${window.innerHeight - scorePeek.rect.top + 6}px`,
-            right: `${window.innerWidth - scorePeek.rect.right}px`,
-          }}
+          style={getPeekTooltipStyle(scorePeek.rect)}
         >
-          {buildPeekContent(scorePeek.sub, useMoonlight)}
+          {buildPeekContent(scorePeek.sub, scorePeek.useMoonlight)}
         </div>
       )}
     </div>

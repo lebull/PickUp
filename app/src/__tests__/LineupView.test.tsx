@@ -195,7 +195,7 @@ describe('LineupView special events mode', () => {
     await user.click(screen.getByRole('button', { name: 'Stage View' }))
 
     await user.hover(screen.getAllByText('DJ Alpha')[0])
-    expect(screen.getByText('Avg')).toBeTruthy()
+    expect(screen.getAllByText('Avg').length).toBeGreaterThan(0)
   })
 
   it('closes score peek tooltip when removing a DJ from a slot', async () => {
@@ -216,12 +216,13 @@ describe('LineupView special events mode', () => {
     await user.click(screen.getByRole('button', { name: 'Stage View' }))
 
     await user.hover(screen.getAllByText('DJ Alpha')[0])
-    expect(screen.getByText('Avg')).toBeTruthy()
+    const beforeRemoveAvgCount = screen.getAllByText('Avg').length
+    expect(beforeRemoveAvgCount).toBeGreaterThan(0)
 
     await user.click(screen.getAllByTitle('Remove DJ')[0])
 
     await waitFor(() => {
-      expect(screen.queryByText('Avg')).toBeNull()
+      expect(screen.queryAllByText('Avg').length).toBeLessThan(beforeRemoveAvgCount)
     })
   })
 

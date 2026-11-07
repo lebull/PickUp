@@ -74,6 +74,19 @@ describe('buildPeekContent', () => {
     expect(buildPeekContent(sub, false)).toBeNull()
   })
 
+  it('returns avg-only content when only main average exists', () => {
+    const sub = makeSubmission({
+      j1Technical: null, j1Flow: null, j1Entertainment: null,
+      j2Technical: null, j2Flow: null, j2Entertainment: null,
+      j3Technical: null, j3Flow: null, j3Entertainment: null,
+      mainScore: { avg: 7.25, sum: null, partial: false },
+    })
+    const content = buildPeekContent(sub, false)
+    const { getByText } = render(<>{content}</>)
+    expect(getByText('Avg')).toBeTruthy()
+    expect(getByText('7.25')).toBeTruthy()
+  })
+
   it('shows ML avg and gear in moonlight context', () => {
     const sub = makeSubmission({
       mlTechnical: 9, mlFlow: 8, mlEntertainment: 7,
@@ -94,8 +107,23 @@ describe('hasAnyScore', () => {
   })
 
   it('returns false when all judge scores are null', () => {
-    const sub = makeSubmission({ j1Technical: null, j1Flow: null, j1Entertainment: null })
+    const sub = makeSubmission({
+      j1Technical: null, j1Flow: null, j1Entertainment: null,
+      j2Technical: null, j2Flow: null, j2Entertainment: null,
+      j3Technical: null, j3Flow: null, j3Entertainment: null,
+      mainScore: { avg: null, sum: null, partial: false },
+    })
     expect(hasAnyScore(sub, false)).toBe(false)
+  })
+
+  it('returns true when only main average exists', () => {
+    const sub = makeSubmission({
+      j1Technical: null, j1Flow: null, j1Entertainment: null,
+      j2Technical: null, j2Flow: null, j2Entertainment: null,
+      j3Technical: null, j3Flow: null, j3Entertainment: null,
+      mainScore: { avg: 6.5, sum: null, partial: false },
+    })
+    expect(hasAnyScore(sub, false)).toBe(true)
   })
 
   it('returns true for ML scores when useMoonlight=true', () => {
@@ -106,5 +134,10 @@ describe('hasAnyScore', () => {
   it('returns false for ML when all ML scores are null', () => {
     const sub = makeSubmission()
     expect(hasAnyScore(sub, true)).toBe(false)
+  })
+
+  it('returns true for ML when only ML average exists', () => {
+    const sub = makeSubmission({ mlScore: { avg: 7.75, sum: null } })
+    expect(hasAnyScore(sub, true)).toBe(true)
   })
 })

@@ -235,8 +235,56 @@ describe('DJSelectionPanel — slot tray details', () => {
 
     // The score span in the tray row triggers peek; tooltip should appear containing the avg
     const scoreCells = screen.getAllByText('8.50')
+    expect(scoreCells[0].getAttribute('title')).toBeNull()
     await user.hover(scoreCells[0])
     // Tooltip shows the peek content (avg label "Avg" + value)
+    expect(screen.getByText('Avg')).toBeTruthy()
+  })
+
+  it('shows peek tooltip when hovering a DJ row in the picker list', async () => {
+    const user = userEvent.setup()
+    const dj = makeSubmission('S001', 'DJ Alpha', {
+      formatGear: 'CDJs',
+      mainScore: { avg: 8.5, sum: 25.5, partial: false },
+      j1Technical: 8, j1Flow: 9, j1Entertainment: 8,
+    })
+
+    renderPanel([dj], [], vi.fn(), [testStage])
+
+    await user.hover(screen.getByRole('button', { name: 'Assign DJ Alpha' }))
+    expect(screen.getByText('Avg')).toBeTruthy()
+  })
+
+  it('shows peek tooltip when hovering a DJ row in browsing mode', async () => {
+    const user = userEvent.setup()
+    const dj = makeSubmission('S001', 'DJ Alpha', {
+      mainScore: { avg: 8.5, sum: 25.5, partial: false },
+      j1Technical: 8, j1Flow: 9, j1Entertainment: 8,
+    })
+
+    render(
+      <Wrapper>
+        <DJSelectionPanel
+          submissions={[dj]}
+          stages={[testStage]}
+          assignments={[]}
+          discardedSubmissionNumbers={new Set()}
+          activeSlot={null}
+          currentEvening="Friday"
+          onAssign={vi.fn()}
+          onRemove={vi.fn()}
+          onAddSimultaneous={vi.fn()}
+          onRemoveSimultaneous={vi.fn()}
+          onAssignBlank={vi.fn()}
+          onAddBlankSimultaneous={vi.fn()}
+          onPositionSelect={vi.fn()}
+          onSelectSlot={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    await user.hover(screen.getByRole('button', { name: 'DJ Alpha' }))
     expect(screen.getByText('Avg')).toBeTruthy()
   })
 })

@@ -7,6 +7,7 @@ import { hexToTint } from '../../../stageColors.ts'
 import type { ActiveSlot } from './DJSelectionPanel.tsx'
 import { SequentialSlotCell } from '../../../shared/components/SequentialSlotCell.tsx'
 import { buildPeekContent, hasAnyScore } from '../../../scorePeekUtils.tsx'
+import { getPeekTooltipStyle } from '../../../shared/peekTooltipPosition.ts'
 
 interface Props {
   submissions: Submission[]
@@ -403,11 +404,7 @@ export function StageGrid({
       {gridPeek && (
         <div
           className="score-peek-tooltip"
-          style={{
-            position: 'fixed',
-            bottom: `${window.innerHeight - gridPeek.rect.top + 6}px`,
-            right: `${window.innerWidth - gridPeek.rect.right}px`,
-          }}
+          style={getPeekTooltipStyle(gridPeek.rect)}
         >
           {buildPeekContent(gridPeek.sub, gridPeek.useMoonlight)}
         </div>

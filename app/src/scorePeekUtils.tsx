@@ -8,9 +8,10 @@ function fmt(n: number | null): string {
 /** Returns true if the submission has at least one non-null score value. */
 export function hasAnyScore(sub: Submission, useMoonlight: boolean): boolean {
   if (useMoonlight) {
-    return sub.mlTechnical !== null || sub.mlFlow !== null || sub.mlEntertainment !== null
+    return sub.mlScore.avg !== null || sub.mlTechnical !== null || sub.mlFlow !== null || sub.mlEntertainment !== null
   }
   return (
+    sub.mainScore.avg !== null ||
     sub.j1Technical !== null || sub.j1Flow !== null || sub.j1Entertainment !== null ||
     sub.j2Technical !== null || sub.j2Flow !== null || sub.j2Entertainment !== null ||
     sub.j3Technical !== null || sub.j3Flow !== null || sub.j3Entertainment !== null
@@ -22,7 +23,7 @@ export function buildPeekContent(sub: Submission, useMoonlight: boolean): ReactN
   const avgScore = useMoonlight ? sub.mlScore.avg : sub.mainScore.avg
 
   if (useMoonlight) {
-    if (sub.mlTechnical === null && sub.mlFlow === null && sub.mlEntertainment === null) return null
+    if (avgScore === null && sub.mlTechnical === null && sub.mlFlow === null && sub.mlEntertainment === null) return null
     return (
       <>
         <div className="score-peek-header">
@@ -45,7 +46,17 @@ export function buildPeekContent(sub: Submission, useMoonlight: boolean): ReactN
     { label: 'J3', tech: sub.j3Technical, flow: sub.j3Flow, ent: sub.j3Entertainment, notes: sub.j3Notes },
   ].filter((j) => j.tech !== null || j.flow !== null || j.ent !== null)
 
-  if (judges.length === 0) return null
+  if (judges.length === 0) {
+    if (avgScore === null) return null
+    return (
+      <>
+        <div className="score-peek-header">
+          <span className="score-peek-avg"><span className="score-peek-dim">Avg</span> {fmt(avgScore)}</span>
+        </div>
+        {sub.formatGear && <div className="score-peek-gear-row"><span className="score-peek-gear" title={sub.formatGear}>{sub.formatGear}</span></div>}
+      </>
+    )
+  }
 
   return (
     <>

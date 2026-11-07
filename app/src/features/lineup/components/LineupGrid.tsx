@@ -6,6 +6,7 @@ import { getSlotLabels, getEveningTimeAxis, getSimultaneousRowRange, formatTimeL
 import { useAppPreferences } from '../../../shared/context/AppPreferencesContext.ts'
 import { getReadableTextColor, hexToTint } from '../../../stageColors.ts'
 import { buildPeekContent, hasAnyScore } from '../../../scorePeekUtils.tsx'
+import { getPeekTooltipStyle } from '../../../shared/peekTooltipPosition.ts'
 import { SequentialSlotCell } from '../../../shared/components/SequentialSlotCell.tsx'
 
 interface SequentialSlotSpan {
@@ -590,11 +591,7 @@ export function LineupGrid({
       {gridPeek && (
         <div
           className="score-peek-tooltip"
-          style={{
-            position: 'fixed',
-            bottom: `${window.innerHeight - gridPeek.rect.top + 6}px`,
-            right: `${window.innerWidth - gridPeek.rect.right}px`,
-          }}
+          style={getPeekTooltipStyle(gridPeek.rect)}
         >
           {buildPeekContent(gridPeek.sub, gridPeek.useMoonlight)}
         </div>
