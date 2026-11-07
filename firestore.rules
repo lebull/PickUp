@@ -2,6 +2,12 @@ rules_version='2'
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function authEmailLower() {
+      return request.auth != null && request.auth.token.email is string
+        ? request.auth.token.email.lower()
+        : null;
+    }
+
     function isSelf(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
@@ -13,19 +19,46 @@ service cloud.firestore {
       );
     }
 
+    function hasPendingCoordinatorGrant() {
+      return request.auth != null &&
+        authEmailLower() != null &&
+        exists(/databases/$(database)/documents/roleGrants/$(authEmailLower())) &&
+        get(/databases/$(database)/documents/roleGrants/$(authEmailLower())).data.coordinator == true;
+    }
+
+    function claimsCoordinatorRole() {
+      return request.resource.data.roles is map &&
+        request.resource.data.roles.coordinator == true;
+    }
+
     match /projects/{projectId} {
       allow read, write: if isCoordinator();
+    }
+
+    match /roleGrants/{emailLower} {
+      allow read: if isCoordinator() || (
+        request.auth != null &&
+        authEmailLower() != null &&
+        authEmailLower() == emailLower
+      );
+      allow create, update, delete: if isCoordinator();
     }
 
     match /users/{uid} {
       allow read: if request.auth != null && (isSelf(uid) || isCoordinator());
       allow create: if isCoordinator() || (
         isSelf(uid) &&
-        !(request.resource.data.roles is map)
+        (
+          !(request.resource.data.roles is map) ||
+          (claimsCoordinatorRole() && hasPendingCoordinatorGrant())
+        )
       );
       allow update: if isCoordinator() || (
         isSelf(uid) &&
-        request.resource.data.roles == resource.data.roles
+        (
+          request.resource.data.roles == resource.data.roles ||
+          (claimsCoordinatorRole() && hasPendingCoordinatorGrant())
+        )
       );
       allow delete: if false;
     }

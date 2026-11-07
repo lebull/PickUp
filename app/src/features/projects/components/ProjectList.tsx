@@ -7,6 +7,7 @@ import {
   exportProject,
   importProjectFromFile,
 } from '../../../projectStore.ts'
+import { LogoutButton } from '../../auth/components/LogoutButton.tsx'
 
 export function ProjectList() {
   const navigate = useNavigate()
@@ -88,6 +89,7 @@ export function ProjectList() {
           >
             + New Project
           </button>
+          <LogoutButton />
         </div>
       </header>
 

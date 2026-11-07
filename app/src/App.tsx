@@ -13,6 +13,7 @@ import { ProjectContext } from './shared/context/ProjectContext.ts'
 import { AppPreferencesContext, useAppPreferencesState } from './shared/context/AppPreferencesContext.ts'
 import { NavActionsMenu } from './features/navigation/components/NavActionsMenu.tsx'
 import { AuthGate } from './features/auth/components/AuthGate.tsx'
+import { LogoutButton } from './features/auth/components/LogoutButton.tsx'
 import { CsvImport } from './features/submissions/components/CsvImport.tsx'
 import { UserManagement } from './features/admin/components/UserManagement.tsx'
 
@@ -184,6 +185,7 @@ function ProjectWorkspace() {
                 saveProject(updated)
               }}
             />
+            <LogoutButton />
           </div>
         </header>
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createProject } from '../../../projectStore'
+import { LogoutButton } from '../../auth/components/LogoutButton.tsx'
 
 export function ProjectCreate() {
   const navigate = useNavigate()
@@ -32,6 +33,9 @@ export function ProjectCreate() {
     <div className="project-create-page">
       <header className="app-header">
         <h1 className="app-title">New Project</h1>
+        <div className="header-actions">
+          <LogoutButton />
+        </div>
       </header>
       <main className="app-main">
         <form className="project-create-form" onSubmit={handleSubmit}>

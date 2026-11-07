@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { setUserCoordinator } from '../../../userRolesStore.ts'
+import { LogoutButton } from '../../auth/components/LogoutButton.tsx'
 
 type Mode = 'grant' | 'revoke'
 
@@ -47,12 +48,15 @@ export function UserManagement() {
       <header className="app-header">
         <Link to="/" className="back-link">← Projects</Link>
         <h1 className="app-title">User Management</h1>
+        <div className="header-actions">
+          <LogoutButton />
+        </div>
       </header>
 
       <main className="app-main">
         <form className="project-create-form" onSubmit={handleSubmit}>
           <p className="empty-state-message user-mgmt-note">
-            Manage coordinator access by Firebase Auth UID, email, or username. Users must sign in once so their profile is indexed.
+            Manage coordinator access by Firebase Auth UID, email, or username. Email grants now work before first sign-in and are applied automatically when that user logs in.
           </p>
 
           <div className="form-field">
@@ -85,7 +89,7 @@ export function UserManagement() {
 
           {result && (
             <div className="user-mgmt-result">
-              <p><strong>Updated user:</strong> {result.uid}</p>
+              <p><strong>Updated target:</strong> {result.uid}</p>
               <p><strong>Coordinator:</strong> {result.coordinator ? 'yes' : 'no'}</p>
             </div>
           )}
